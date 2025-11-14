@@ -21,7 +21,8 @@ source("R/0_Helpers.R")
 
 
 # Read in the data ----
-dat <- read_csv("https://www.dropbox.com/scl/fi/b1pl3iys1kqtuiwbfd99h/IngClear_dat.csv?rlkey=4ce0im2s1latych74hos8uors&st=o76hl32v&dl=1", skip = 1) %>% 
+dat <- read_csv("https://www.dropbox.com/scl/fi/b1pl3iys1kqtuiwbfd99h/IngClear_dat.csv?rlkey=4ce0im2s1latych74hos8uors&st=8c3k443n&dl=1", 
+                skip = 1) %>%
   mutate(ref_no = paste0("Hill_", row_number()),
          taxa = str_squish(taxa)) %>% # create a unique identifier (e.g., Hill_row#)
   relocate(ref_no, .before = everything()) # move it before all columns
@@ -94,12 +95,13 @@ taxaDat <- dat %>%
 
 # Join taxa info and harmonize weight data ----
 datClean <- dat %>% 
-  left_join(taxaDat, by = "taxa") %>% 
-  rowwise() %>% 
-  mutate(BMC_mg = convert_CW(BM_C, weight_unit)) %>% # harmonize C weight data to mg
-  ungroup() %>% 
-  relocate(c(phylum, class, order, family, genus), .before = taxa) %>% 
-  relocate(BMC_mg, .after = BM_C)
+    filter(!taxa %in% "Unknown") %>% # remove the "unknown" species 
+    left_join(taxaDat, by = "taxa") %>% 
+    rowwise() %>% 
+    mutate(BMC_mg = convert_CW(BM_C, weight_unit)) %>% # harmonize C weight data to mg
+    ungroup() %>% 
+    relocate(c(phylum, class, order, family, genus), .before = taxa) %>% 
+    relocate(BMC_mg, .after = BM_C)
 
   
   # Count unique classes for ClearanceRate
@@ -138,6 +140,10 @@ datClean <- dat %>%
       filter(rate_name == "ClearanceRate", class == "Appendicularia") %>% 
       select(temp_C) %>% 
       summary()
+    datClean %>% 
+      filter(rate_name == "ClearanceRate", class == "Tentaculata") %>% 
+      select(temp_C) %>% 
+      summary()
       # All have sensible ranges for estimating Q10
       
   
@@ -154,7 +160,7 @@ datClean <- dat %>%
         # Malacostraca
         # Thaliacea
         # Sagittoidea and,
-        # Maybe Sagittoidea...
+        # Maybe Tentaculata
   
   
   # Check the temperature range for each class
@@ -174,7 +180,11 @@ datClean <- dat %>%
       filter(rate_name == "IngestionRate", class == "Sagittoidea") %>% 
       select(temp_C) %>% 
       summary()
-        # All except Sagittoidea (17-21 degC) have sensible ranges for estimating Q10
+    datClean %>% 
+      filter(rate_name == "IngestionRate", class == "Tentaculata") %>% 
+      select(temp_C) %>% 
+      summary()
+        # All except Sagittoidea (17-21 degC) and Tentaculata (10 degC only) have sensible ranges for estimating Q10
 
 # End data cleaning ----
     
@@ -187,10 +197,10 @@ datFinal <- datClean %>%
   rowwise() %>%
   mutate(.conv = list(
     if(rate_name == "ClearanceRate") {
-      convert_clearance(rate_value, rate_unit, BMC_mg)
+      convert_clearance(rate_value, rate_unit)
       } 
     else if(rate_name == "IngestionRate") {
-      convert_ingestion(rate_value, rate_unit, BMC_mg)
+      convert_ingestion(rate_value, rate_unit)
       } 
     else {
       list(rate = NA_real_, unit = NA_character_)
@@ -218,4 +228,12 @@ glimpse(datFinal)
 
 # End conversion
 
-saveRDS(datFinal, "Data/clear_ingest_data.rds")
+  # Final check
+  datFinal %>% 
+    ggplot() + 
+    geom_point(aes(x = temp_C, 
+                   y = log(Cspecific_rate), 
+                   colour = order)) +
+    facet_wrap(~ rate_name, scales ="free")
+
+# saveRDS(datFinal, "Data/clear_ingest_data.rds")

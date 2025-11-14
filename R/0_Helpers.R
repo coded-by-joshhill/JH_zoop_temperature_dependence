@@ -29,7 +29,7 @@ convert_CW <- function(weight, unit) {
 
 # CLEARANCE CONVERTER ----
 # Convert clearance rates to ml/ind/hr
-convert_clearance <- function(rate, unit, BMC_mg) {
+convert_clearance <- function(rate, unit) {
   if (is.na(rate) || is.na(unit)) return(list(rate = NA_real_, unit = NA_character_))
   
   if (unit == "ml/ind/hr")  return(list(rate = rate,                unit = "ml/ind/hr")) # maintain ml/ind/hr
@@ -46,7 +46,7 @@ convert_clearance <- function(rate, unit, BMC_mg) {
 
 # INGESTION CONVERTER ----
 # Convert ingestion rates to mgC/ind/hr
-convert_ingestion <- function(rate, unit, BMC_mg) {
+convert_ingestion <- function(rate, unit) {
   if (is.na(rate) || is.na(unit)) return(list(rate = NA_real_, unit = NA_character_))
   
   if (unit == "mgC/ind/hr") return(list(rate = rate,                unit = "mgC/ind/hr")) # maintain mgC/ind/hr
@@ -54,7 +54,7 @@ convert_ingestion <- function(rate, unit, BMC_mg) {
   if (unit == "ugC/ind/day") return(list(rate = (rate / 1000) / 24, unit = "mgC/ind/hr")) # µg to mg, day to hr
   if (unit == "ngC/ind/hr") return(list(rate = rate / 1e6,          unit = "mgC/ind/hr")) # ng to mg
   if (unit == "ngC/ind/day") return(list(rate = (rate / 1e6) / 24,  unit = "mgC/ind/hr")) # ng to mg, day to hr
-  if (unit == "ngC/mgC/hr") return(list(rate = rate / 1e6,          unit = "mgC/mgC/hr")) # ngC to mgC
+  if (unit == "ugC/mgC/hr") return(list(rate = rate / 1000,         unit = "mgC/mgC/hr")) # ngC to mgC
   if (unit == "ugC/ugC/day") return(list(rate = rate / 24,          unit = "mgC/mgC/hr")) # mgC to mgC ratio cancels out, day to hr
   
   return(list(rate = NA_real_, unit = NA_character_))
@@ -68,19 +68,16 @@ convert_ingestion <- function(rate, unit, BMC_mg) {
 convert_respiration <- function(rate, unit, genus) {
   if (is.na(rate) || is.na(unit)) return(list(rate = NA_real_, unit = NA_character_))
   
-  if (unit == "ulO2/ind/hr") return(list(rate = rate,                 unit = "ulO2/ind/hr")) # maintain ulO2/ind/hr
-  if (unit == "ulO2/ind/day") return(list(rate = rate / 24,           unit = "ulO2/ind/hr")) # day to hr
-  if (unit == "ulO2/mgC/hr") return(list(rate = rate,                 unit = "ulO2/mgC/hr")) # maintain ulO2/mgC/hr
-  if (unit == "ulO2/ugC/day") return(list(rate = rate / 1000,         unit = "ulO2/mgC/hr")) # ugC to mgC
-  if (unit == "umol/ind/hr") return(list(rate = rate * 22.4,          unit = "ulO2/ind/hr")) # umol to ulO2, as per the ideal gas law (i.e., 1 mol of gas = 22.4 L)
-  if (unit == "pmol/ind/hr") return(list(rate = rate * 2.24e-17,      unit = "ulO2/ind/hr")) # pmol to ulO2, as above, but scaled down
-  if (unit == "nlO2/ind/hr") return(list(rate = rate / 1000,          unit = "ulO2/ind/hr")) # nlO2 to ulO2
+  if (unit == "ulO2/ind/hr") return(list(rate = rate,                  unit = "ulO2/ind/hr")) # maintain ulO2/ind/hr
+  if (unit == "ulO2/ind/day") return(list(rate = rate / 24,            unit = "ulO2/ind/hr")) # day to hr
+  if (unit == "ulO2/mgC/hr") return(list(rate = rate,                  unit = "ulO2/mgC/hr")) # maintain ulO2/mgC/hr
+  if (unit == "ulO2/ugC/day") return(list(rate = (rate / 1000) / 24,   unit = "ulO2/mgC/hr")) # ugC to mgC
+  if (unit == "umol/ind/hr") return(list(rate = rate * 22.4,           unit = "ulO2/ind/hr")) # umol to ulO2, as per the ideal gas law (i.e., 1 mol of gas = 22.4 L)
+  if (unit == "nlO2/ind/hr") return(list(rate = rate / 1000,           unit = "ulO2/ind/hr")) # nlO2 to ulO2
   
   # Stoichiometry
-  if (genus == "Acartia" || unit == "ugC/ugC/hr") 
-    return(list(rate = ((rate / (12.011 * 0.66)) * (22.4 / 1000)),      unit = "ulO2/mgC/hr")) # ugC to ulO2, where 0.66 = RQ (Mayzaud2005), ugC to mgC for individuals mass
-  if (genus == "Euphausia" || unit == "ugC/ind/day") 
-    return(list(rate = ((rate / (12.011 * 1.45)) * (22.4 / 24)), unit = "ulO2/ind/hr")) # ugC to ulO2, where 1.45 = RQ (Mayzaud2005), day to hr
+  if (genus == "Euphausia" & unit == "ugC/ind/day") 
+    return(list(rate = ((rate / 24) / (12.011 * 1.45)) * 22.4,         unit = "ulO2/ind/hr")) # ugC to ulO2, where 1.45 = RQ (Mayzaud2005), day to hr
   
   return(list(rate = NA_real_, unit = NA_character_))
 }

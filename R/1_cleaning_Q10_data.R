@@ -1,6 +1,6 @@
 # Cleaning respiration data
 # Josh Hill
-# 12/11/25
+# 14/11/25
 
 
 
@@ -21,19 +21,16 @@ source("R/0_Helpers.R")
 
 
 # Read in the data ----
-dat <- read_csv("https://www.dropbox.com/scl/fi/itv9vpnu8twxz2fyhmp1u/Resp_dat.csv?rlkey=9fig4vcw2cog4rc4qa6mtj7lj&st=p6gcxo9y&dl=1", 
-                skip = 1) %>%
-  mutate(ref_no = if_else(is.na(ref_no) | ref_no == "", # if the value is NA or empty...
-                          paste0("Hill_", row_number()), # apply a unique reference number
-                          ref_no), # otherwise keep what is there
-         taxa = str_squish(taxa)) %>% # remove extra spaces from taxon names
-  relocate(ref_no, .before = everything())  # move it before all columns
+# dat <- read_csv("https://www.dropbox.com/scl/fi/qsach648tlqobvimd34ra/Historic_Q10_dat.csv?rlkey=pfe18t6oo5plxbxzwcpeh42xx&st=57a1nii7&dl=1") %>%
+dat <- read_csv("/Users/jth025/Documents/PhD Local/Local data/Historic_Q10_dat.csv") %>% 
+  mutate(ref_no = paste0("Hill_", row_number()),
+         taxa = str_squish(taxa)) %>% # create a unique identifier (e.g., Hill_row#)
+  relocate(ref_no, .before = everything()) # move it before all columns
 glimpse(dat)
 
 
   # Look at all unique taxon
   dat %>% 
-    filter(rate_name == "RespirationRate") %>% 
     distinct(taxa) %>% 
     arrange(taxa) %>% 
     print(n = "Inf")
@@ -41,10 +38,11 @@ glimpse(dat)
   
   # Look at all unique primary references for each rate type
   dat %>% 
-    group_by(rate_name) %>% 
-    distinct(primRef, rate_name) %>% 
+    group_by(Q10Type) %>% 
+    distinct(primRef) %>% 
     summarise(count = n())
-      # 22 records
+      # 9 interspecific records
+      # 36 intraspecific records
 
   
 
@@ -54,13 +52,19 @@ taxaDat <- dat %>%
   distinct(taxa) %>% 
   arrange(taxa)
   
-  
   # Get AphiaIDs
   taxaDatID <- taxaDat %>% 
-    mutate(AphiaID = map_int(taxa, wm_name2id))  # extract AphiaIDs for taxa using the worrms package
+    mutate(AphiaID = map_int(
+      taxa, # extract AphiaIDs for taxa using the worrms package
+      possibly(~ { Sys.sleep(0.3); wm_name2id(.x)}, # use Sys.sleep to prevent overloading API
+               otherwise = NA_integer_)))  # Set to NA if unable to get AphiaID
 
     taxaDatID %>% 
       summary() # ensure there are no NAs
+    
+    # Need to add aphia ids for the broken ones.
+    # taxaDatID <- taxaDatID %>%
+    #   mutate(AphiaID = if_else(row_number() == 19, "1248", AphiaID))
 
 
   # Add classifications using AphiaIDs
@@ -100,10 +104,10 @@ datClean <- dat %>%
       # Good data for:
         # Copepoda
         # Malacostraca
-        # Hydrozoa
+        # Tentaculata
         # Scyphozoa
         # Thaliacea and
-        # maybe Tentaculata and Nuda...
+        # maybe Sagittoidea and Hydrozoa
   
   
     # Check the temperature range for each class
@@ -116,7 +120,7 @@ datClean <- dat %>%
       select(temp_C) %>% 
       summary()
     datClean %>% 
-      filter(class == "Hydrozoa") %>% 
+      filter(class == "Tentaculata") %>% 
       select(temp_C) %>% 
       summary()
     datClean %>% 
@@ -128,11 +132,11 @@ datClean <- dat %>%
       select(temp_C) %>% 
       summary()
     datClean %>% 
-      filter(class == "Tentaculata") %>% 
+      filter(class == "Sagittoidea") %>% 
       select(temp_C) %>% 
       summary()
     datClean %>% 
-      filter(class == "Nuda") %>% 
+      filter(class == "Hydrozoa") %>% 
       select(temp_C) %>% 
       summary()
         # All have sensible ranges for estimating Q10
@@ -141,32 +145,11 @@ datClean <- dat %>%
 
      
     
-# Harmonise and prep data for analysis ----
+# Prep data for analysis ----
 datFinal <- datClean %>%
-      
-  # Harmonise data with conversion function
-  rowwise() %>%
-  mutate(.conv = list(
-    if(rate_name == "RespirationRate") {
-      convert_respiration(rate_value, rate_unit, genus)
-      } 
-    else {
-      list(rate = NA_real_, unit = NA_character_)
-      }),
-    rate_value_fin = .conv$rate, 
-    rate_unit_fin  = .conv$unit) %>%
-  ungroup() %>%
-      
-      
-  # Convert to mass-specific rates
-  mutate(Cspecific_rate = case_when(
-    rate_name == "RespirationRate" & rate_unit_fin == "ulO2/mgC/hr"                   ~ rate_value_fin,
-    rate_name == "RespirationRate" & rate_unit_fin == "ulO2/ind/hr" & !is.na(BMC_mg)  ~ rate_value_fin / BMC_mg,
-    TRUE ~ NA_real_),
-    final_unit = case_when(
-      rate_name == "RespirationRate" & !is.na(Cspecific_rate) ~ "ulO2/mgC/hr",
-      TRUE ~ rate_unit_fin)) %>%
-  #select(-.conv, -rate_value_fin, -rate_unit_fin) %>% 
+  # No need to harmoise this data (unless more is added)... so I'll use a simple mutate to maintain naming convention consistency
+  mutate(Cspecific_rate = rate_value,
+         final_unit = rate_unit) %>% 
   relocate(Cspecific_rate, .after = rate_name) %>% 
   relocate(final_unit, .after = Cspecific_rate)
 glimpse(datFinal)
@@ -178,6 +161,6 @@ glimpse(datFinal)
     ggplot() + 
     geom_point(aes(x = temp_C, 
                    y = log(Cspecific_rate), 
-                   colour = order))
+                   colour = primRef))
 
-# saveRDS(datFinal, "Data/resp_dat.rds")
+# saveRDS(datFinal, "Data/grwth_dat.rds")
