@@ -1,4 +1,4 @@
-# Cleaning respiration data
+# Cleaning historic Q10 data
 # Josh Hill
 # 14/11/25
 
@@ -6,7 +6,7 @@
 
   # Here I read in the data
   # Use worrms package to get AphiaID's and taxon classifications
-  # Harmonise weight data to mg
+  # 
   # Convert absolute rates to mass-specific
   # Save as an RDS file
 
@@ -16,13 +16,13 @@
 library(tidyverse)
 library(worrms)
 library(janitor)
+library(gtsummary)
 source("R/0_Helpers.R")
 
 
 
 # Read in the data ----
-# dat <- read_csv("https://www.dropbox.com/scl/fi/qsach648tlqobvimd34ra/Historic_Q10_dat.csv?rlkey=pfe18t6oo5plxbxzwcpeh42xx&st=57a1nii7&dl=1") %>%
-dat <- read_csv("/Users/jth025/Documents/PhD Local/Local data/Historic_Q10_dat.csv") %>% 
+dat <- read_csv("https://www.dropbox.com/scl/fi/qsach648tlqobvimd34ra/Historic_Q10_dat.csv?rlkey=pfe18t6oo5plxbxzwcpeh42xx&st=dws86kwd&dl=1") %>%
   mutate(ref_no = paste0("Hill_", row_number()),
          taxa = str_squish(taxa)) %>% # create a unique identifier (e.g., Hill_row#)
   relocate(ref_no, .before = everything()) # move it before all columns
@@ -62,9 +62,9 @@ taxaDat <- dat %>%
     taxaDatID %>% 
       summary() # ensure there are no NAs
     
-    # Need to add aphia ids for the broken ones.
-    # taxaDatID <- taxaDatID %>%
-    #   mutate(AphiaID = if_else(row_number() == 19, "1248", AphiaID))
+    # Manually add Aphia ids for Ctenophora on row 19
+    taxaDatID <- taxaDatID %>%
+      mutate(AphiaID = if_else(row_number() == 19, 1248, AphiaID))
 
 
   # Add classifications using AphiaIDs
@@ -85,82 +85,57 @@ taxaDat <- dat %>%
 
   
 
-# Join taxa info and harmonize weight data ----
+# Join taxa info back into Q10 data ----
 datClean <- dat %>% 
   left_join(taxaDat, by = "taxa") %>% 
-  rowwise() %>% 
-  mutate(BMC_mg = convert_CW(BM_C, weight_unit)) %>% # harmonize C weight data to mg
-  ungroup() %>% 
-  relocate(c(phylum, class, order, family, genus), .before = taxa) %>% 
-  relocate(BMC_mg, .after = BM_C)
-
+  relocate(c(phylum, class, order, family, genus), .before = taxa)
+  glimpse(datClean)
   
-  # Count unique classes
+  
+  # Count number of unique phylums
+  datClean %>% 
+    group_by(phylum) %>% 
+    mutate(countPhylum = sum(phylum > 1, na.rm = TRUE)) %>% 
+    distinct(phylum, countPhylum) %>% 
+    arrange(countPhylum)
+      # Good data for:
+        # Rotifera               1
+        # Chaetognatha           1
+        # Ctenophora             1
+        # Cnidaria              10
+        # Chordata              11
+        # Mollusca              15
+        # Arthropoda           162
+  
+  # Count number of unique class
   datClean %>% 
     group_by(class) %>% 
     mutate(countClass = sum(class > 1, na.rm = TRUE)) %>% 
     distinct(class, countClass) %>% 
     arrange(countClass)
-      # Good data for:
-        # Copepoda
-        # Malacostraca
-        # Tentaculata
-        # Scyphozoa
-        # Thaliacea and
-        # maybe Sagittoidea and Hydrozoa
+  # Data for:
+    # Thaliacea               1
+    # Bivalvia                7
+    # Gastropoda              7
+    # Scyphozoa               9
+    # Appendicularia         10
+    # Malacostraca           64
+    # Copepoda               98
   
+
+  # Summarise the data by class and phylum
+  datClean %>% 
+    select(class, Q10, Q10Type) %>% 
+    tbl_summary(by = class,
+                statistic = list(all_continuous() ~ "{mean} ({sd})"))
   
-    # Check the temperature range for each class
-    datClean %>% 
-      filter(class == "Copepoda") %>% 
-      select(temp_C) %>% 
-      summary()
-    datClean %>% 
-      filter(class == "Malacostraca") %>% 
-      select(temp_C) %>% 
-      summary()
-    datClean %>% 
-      filter(class == "Tentaculata") %>% 
-      select(temp_C) %>% 
-      summary()
-    datClean %>% 
-      filter(class == "Scyphozoa") %>% 
-      select(temp_C) %>% 
-      summary()
-    datClean %>% 
-      filter(class == "Thaliacea") %>% 
-      select(temp_C) %>% 
-      summary()
-    datClean %>% 
-      filter(class == "Sagittoidea") %>% 
-      select(temp_C) %>% 
-      summary()
-    datClean %>% 
-      filter(class == "Hydrozoa") %>% 
-      select(temp_C) %>% 
-      summary()
-        # All have sensible ranges for estimating Q10
+  datClean %>% 
+    select(phylum, Q10, Q10Type) %>% 
+    tbl_summary(by = phylum,
+                statistic = list(all_continuous() ~ "{mean} ({sd})"))
 
 # End data cleaning ----
 
-     
-    
-# Prep data for analysis ----
-datFinal <- datClean %>%
-  # No need to harmoise this data (unless more is added)... so I'll use a simple mutate to maintain naming convention consistency
-  mutate(Cspecific_rate = rate_value,
-         final_unit = rate_unit) %>% 
-  relocate(Cspecific_rate, .after = rate_name) %>% 
-  relocate(final_unit, .after = Cspecific_rate)
-glimpse(datFinal)
+  
 
-# End conversion
-
-  # Final check
-  datFinal %>% 
-    ggplot() + 
-    geom_point(aes(x = temp_C, 
-                   y = log(Cspecific_rate), 
-                   colour = primRef))
-
-# saveRDS(datFinal, "Data/grwth_dat.rds")
+# saveRDS(datClean, "Data/historicQ10_dat.rds")
