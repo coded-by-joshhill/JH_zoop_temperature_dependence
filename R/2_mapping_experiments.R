@@ -38,7 +38,6 @@ mdat <- reduce(dfs, full_join) %>%
   
   # Assign appropriate names for feeding type
   levels(mdat$rate_name) <- c("Clearance", "Ingestion", "Growth", "Respiration") 
-
   
   
 # Set study area and read in shapefiles ----
@@ -58,16 +57,26 @@ world <- ne_countries(scale = "medium", returnclass = "sf") %>%
 
 
   
-# Convert to sf
+# Convert rate data to sf for plotting
 pts <- mdat %>% 
+  drop_na(lat, lon) %>% 
+  st_as_sf(coords = c("lon", "lat"), crs = 4326) %>% 
+  st_transform(crs = "+proj=robin") # transform point data to Robinson projection
+
+# Convert Q10 data to sf for plotting
+Q10pts <- Q10Dat %>% 
+  select(rate, lat, lon) %>%
+  mutate(Q10 = "Q10") %>% 
+  drop_na(lat, lon) %>% 
   st_as_sf(coords = c("lon", "lat"), crs = 4326) %>% 
   st_transform(crs = "+proj=robin") # transform point data to Robinson projection
 
 # Define color palette
-mycols <- c("Clearance" = "#d64545", 
-            "Ingestion" = "#6b8e23", 
-            "Growth" = "#2e7d9a", 
-            "Respiration" = "#9370db")
+mycols <- c("Clearance" = "#66c2a5", 
+            "Ingestion" = "#fc8d62", 
+            "Growth" = "#8da0cb", 
+            "Respiration" = "#e78ac3",
+            "Q10" = "#a6d854")
 
 # Create graticules
 graticule <- st_graticule(
@@ -95,14 +104,19 @@ mainmap <- ggplot() +
           shape = 21,
           colour = "#404040",
           size = 2) +
+  geom_sf(data = Q10pts,
+          aes(fill = Q10),
+          shape = 25,
+          colour = "#404040",
+          size = 2) +
   geom_sf(data = outline, fill = NA, colour = "black", linewidth = 0.2) +
   scale_fill_manual(values = mycols) +
   theme_void() +
   theme(legend.position = "top",
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14)) +
-  guides(fill = guide_legend(title = "Feeding type"),
-         color = guide_legend(title = "Feeding type")) 
+  guides(fill = guide_legend(title = "Data type"),
+         color = guide_legend(title = "Data type")) 
   
 mainmap
 
@@ -115,14 +129,19 @@ Europe <- ggplot() +
           shape = 21,
           colour = "#404040",
           size = 2) +
+  geom_sf(data = Q10pts,
+          aes(fill = Q10),
+          shape = 25,
+          colour = "#404040",
+          size = 2) +
+  geom_sf(data = outline, fill = NA, colour = "black", linewidth = 0.2) +
   scale_fill_manual(values = mycols) +
   coord_sf(xlim = c(-20, 40), ylim = c(35, 80), crs = 4326) +  # Europe bounds
   theme_bw() +
-  theme(legend.position = "null",
+  theme(legend.position = "none",
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14),
-        panel.grid = element_blank()) +
-  guides(fill = guide_legend(title = "Feeding type"))
+        panel.grid = element_blank())
 
 Europe
 
@@ -135,14 +154,19 @@ NorthOceans <- ggplot() +
           shape = 21,
           colour = "#404040",
           size = 2) +
+  geom_sf(data = Q10pts,
+          aes(fill = Q10),
+          shape = 25,
+          colour = "#404040",
+          size = 2) +
+  geom_sf(data = outline, fill = NA, colour = "black", linewidth = 0.2) +
   scale_fill_manual(values = mycols) +
   coord_sf(xlim = c(-160, -50), ylim = c(20, 70), crs = 4326) +  # Europe bounds
   theme_bw() +
-  theme(legend.position = "null",
+  theme(legend.position = "none",
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14),
-        panel.grid = element_blank()) +
-  guides(fill = guide_legend(title = "Feeding type"))
+        panel.grid = element_blank())
 
 NorthOceans
 
@@ -155,14 +179,19 @@ NWPacific <- ggplot() +
           shape = 21,
           colour = "#404040",
           size = 2) +
+  geom_sf(data = Q10pts,
+          aes(fill = Q10),
+          shape = 25,
+          colour = "#404040",
+          size = 2) +
+  geom_sf(data = outline, fill = NA, colour = "black", linewidth = 0.2) +
   scale_fill_manual(values = mycols) +
   coord_sf(xlim = c(100, 160), ylim = c(20, 50), crs = 4326) +  # Europe bounds
   theme_bw() +
-  theme(legend.position = "null",
+  theme(legend.position = "none",
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14),
-        panel.grid = element_blank()) +
-  guides(fill = guide_legend(title = "Feeding type"))
+        panel.grid = element_blank())
 
 NWPacific
 
@@ -175,21 +204,32 @@ SOcean <- ggplot() +
           shape = 21,
           colour = "#404040",
           size = 2) +
+  geom_sf(data = Q10pts,
+          aes(fill = Q10),
+          shape = 25,
+          colour = "#404040",
+          size = 2) +
+  geom_sf(data = outline, fill = NA, colour = "black", linewidth = 0.2) +
   scale_fill_manual(values = mycols) +
-  coord_sf(xlim = c(-120, 180), ylim = c(-80, -30), crs = 4326) +
+  coord_sf(xlim = c(-90, 160), ylim = c(-80, -30), crs = 4326) +
   theme_bw() +
-  theme(legend.position = "null",
+  theme(legend.position = "none",
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14),
-        panel.grid = element_blank()) +
-  guides(fill = guide_legend(title = "Feeding type"))
+        panel.grid = element_blank())
 
 SOcean
 
 
 
 # Combine plots
+(mainmap | Europe )/
+  (NorthOceans | NWPacific) /
+  (SOcean) +
+  plot_layout(height = c(2, 1.5, 1)) +
+  plot_annotation(tag_levels = 'A') &
+  theme(plot.tag = element_text(size = 12, face = "bold"))
 
-mainmap / (NorthOceans | Europe | NWPacific) / (SOcean) +
-  plot_layout(heights = c(4, 2, 2), widths = c(1, 1, 1))
+  
+# Using patchwork is like spreading frozen butter on fresh bread... leaving this as is for now...
 

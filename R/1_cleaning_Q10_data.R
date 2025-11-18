@@ -16,16 +16,20 @@
 library(tidyverse)
 library(worrms)
 library(janitor)
-library(gtsummary)
 source("R/0_Helpers.R")
 
 
 
 # Read in the data ----
-dat <- read_csv("https://www.dropbox.com/scl/fi/qsach648tlqobvimd34ra/Historic_Q10_dat.csv?rlkey=pfe18t6oo5plxbxzwcpeh42xx&st=dws86kwd&dl=1") %>%
-  mutate(ref_no = paste0("Hill_", row_number()),
-         taxa = str_squish(taxa)) %>% # create a unique identifier (e.g., Hill_row#)
-  relocate(ref_no, .before = everything()) # move it before all columns
+dat <- read_csv("https://www.dropbox.com/scl/fi/qsach648tlqobvimd34ra/Historic_Q10_dat.csv?rlkey=pfe18t6oo5plxbxzwcpeh42xx&st=odca7bem&dl=1") %>%
+  mutate(ref_no = paste0("Hill_", row_number()), # create a unique identifier (e.g., Hill_row#)
+         taxa = str_squish(taxa),
+         rate = recode(rate,
+                        "AmmoniaExcretion" = "ExcretionAmmonia",
+                       .default = rate)) %>% 
+  relocate(ref_no, .before = everything()) %>%  # move it before all columns
+  select(-temp_range_C)
+  
 glimpse(dat)
 
 
@@ -43,6 +47,12 @@ glimpse(dat)
     summarise(count = n())
       # 9 interspecific records
       # 36 intraspecific records
+  
+  
+  # Look at the Q10 types and rates
+  dat %>% 
+    group_by(rate) %>% 
+    distinct(rate)
 
   
 
@@ -62,7 +72,7 @@ taxaDat <- dat %>%
     taxaDatID %>% 
       summary() # ensure there are no NAs
     
-    # Manually add Aphia ids for Ctenophora on row 19
+    # Manually add Aphia ids for missing data
     taxaDatID <- taxaDatID %>%
       mutate(AphiaID = if_else(row_number() == 19, 1248, AphiaID))
 
@@ -121,18 +131,6 @@ datClean <- dat %>%
     # Appendicularia         10
     # Malacostraca           64
     # Copepoda               98
-  
-
-  # Summarise the data by class and phylum
-  datClean %>% 
-    select(class, Q10, Q10Type) %>% 
-    tbl_summary(by = class,
-                statistic = list(all_continuous() ~ "{mean} ({sd})"))
-  
-  datClean %>% 
-    select(phylum, Q10, Q10Type) %>% 
-    tbl_summary(by = phylum,
-                statistic = list(all_continuous() ~ "{mean} ({sd})"))
 
 # End data cleaning ----
 
