@@ -223,13 +223,15 @@ SOcean
 
 
 # Combine plots
-(mainmap | Europe )/
+(Figure_1 <- (mainmap | Europe )/
   (NorthOceans | NWPacific) /
   (SOcean) +
   plot_layout(height = c(2, 1.5, 1)) +
-  plot_annotation(tag_levels = 'A') &
-  theme(plot.tag = element_text(size = 12, face = "bold"))
+  # plot_annotation(tag_levels = 'A') &
+  theme(plot.tag = element_text(size = 12, face = "bold")))
 
-  
+# ggsave("Output/Figure_1.png", plot = Figure_1, width = 10, height = 10)
+
+
 # Using patchwork is like spreading frozen butter on fresh bread... leaving this as is for now...
 
