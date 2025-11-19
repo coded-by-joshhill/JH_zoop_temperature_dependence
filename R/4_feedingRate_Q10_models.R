@@ -53,16 +53,15 @@ usedat <- dat %>%
   # Quickly view distribution of Cspecific_rates by zoopGrp
   usedat %>%
     ggplot(aes(x = Cspecific_rate)) +
-    geom_histogram(bins = 50, fill = "skyblue", color = "black") +
+    geom_histogram(bins = 50, fill = "slateblue", color = "black") +
     scale_x_log10() + # use log 10 to see extreme outliers
     facet_wrap(~zoopGrp, scales = "free") + 
     theme_bw() +
     labs(
       x = "Clearance rate (Cspecific_rate, log10 scale)",
       y = "Count",
-      title = "Distribution of Cspecific_rate for each zooplankton group"
-    )
-    # I will use this to remove extreme outliers, particularly those that don't make biological sense
+      title = "Distribution of Cspecific_rate for each zooplankton group")
+      # I will use this to remove extreme outliers, particularly those that don't make biological sense
 
   
   
@@ -144,7 +143,7 @@ ratePlot <- mdat %>%
         axis.text = element_text(size = 12)) +
   labs(
     x = expression(bold("Zooplankton group")),
-    y = expression(bold("ln Clearance rate (ml mgC"^-1*" h"^-1*")"))) 
+    y = expression(bold("log Clearance rate (ml mgC"^-1*" h"^-1*")"))) 
 
 
 # Dot plot of Q10
@@ -163,8 +162,10 @@ Q10plot <- clearanceQ10s %>%
     x = expression(bold("Zooplankton group")),
     y = expression(bold("Q10")))
 
-ratePlot + Q10plot +
-  plot_layout(axis_titles = "collect_x")
+(figure2 <- ratePlot + Q10plot +
+  plot_layout(axis_titles = "collect_x"))
+
+# ggsave("Output/Figure_2.png", plot = figure2, width = 12, height = 8)
 
 
 # Produce Arrhenius plots for supplements material ----
@@ -195,7 +196,7 @@ all_labels <- data.frame(
 
 
 # Create plot
-arrh_plot_faceted <- ggplot() +
+arrhenius_plots <- ggplot() +
   # raw points
   geom_point(data = all_data, 
              aes(x = x, y = Cspecific_rate), 
@@ -213,7 +214,7 @@ arrh_plot_faceted <- ggplot() +
             aes(x = x, y = y, label = label),
             hjust = 0, vjust = 1.5,
             size = 4, colour = "darkblue") +
-  # reverse x-axis for Arrhenius style
+  # reverse x-axis to account for Arrhenius styling
   scale_x_continuous(name = expression(bold("1 / Temp (K"^-1*")")),
                      trans = "reverse",
                      sec.axis = sec_axis(~1/. - 273.15, name = "Temp (°C)")) +
@@ -229,7 +230,6 @@ arrh_plot_faceted <- ggplot() +
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())
 
-arrh_plot_faceted
+arrhenius_plots
 
-# saveRDS(copClear, "Output/copepod_clearance.rds")
-
+# ggsave("Output/Figure_Supp1.png", plot = arrhenius_plots, width = 12, height = 8)

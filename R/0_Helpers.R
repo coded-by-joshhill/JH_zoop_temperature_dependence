@@ -93,7 +93,6 @@ analyse_thermal_sensitivity <- function(model, data,
                                         delta_T = 10, # For Q10 calculation
                                         alpha = 0.05) {
   # Calculate Q10 ----
-    
     # Define groups and only progress for 1 group at a time
     grp <- unique(data$zoopGrp)
     stopifnot(length(grp) == 1)
@@ -110,7 +109,9 @@ analyse_thermal_sensitivity <- function(model, data,
                          zoopGrp = grp) 
   
     # Get predictions with std err
-    fit <- predict(model, newdata = newdat, se.fit = TRUE, re.form = NA) # Predict the responses (in ln space) for the two temps
+    fit <- predict(model, newdata = newdat, # Predict the responses (in ln space) for the two temps
+                   se.fit = TRUE, 
+                   re.form = NA) # Maintain population-level predictions (ie., ignore random effects)
   
     # Extract preds and SEs
     pred1 <- fit$fit[1]

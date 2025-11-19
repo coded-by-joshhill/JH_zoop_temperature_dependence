@@ -135,7 +135,10 @@ table1
 gtsave(table1, "Output/Table_1.png", vwidth = 1200, vheight = 700)
 
   
-  #### Below is working and dump code for now ####
+
+
+
+  ####################### Below is working and dump code for now ########################
   
   # Create plotting dataframe
   pdat <- dat %>% 
