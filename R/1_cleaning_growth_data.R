@@ -88,54 +88,48 @@ datClean <- dat %>%
   mutate(BMC_mg = convert_CW(BM_C, weight_unit)) %>% # harmonize C weight data to mg
   ungroup() %>% 
   relocate(c(phylum, class, order, family, genus), .before = taxa) %>% 
-  relocate(BMC_mg, .after = BM_C)
+  relocate(BMC_mg, .after = BM_C) %>% 
+  mutate(zoopGrp = case_when( # Create custom groupings following Ikeda2014
+    order == "Euphausiacea"   ~ "Euphausiacea",
+    order == "Amphipoda"      ~ "Amphipoda",
+    order == "Decapoda"       ~ "Decapoda",
+    order == "Mysida"         ~ "Mysida",
+    class == "Copepoda"       ~ "Copepoda",
+    phylum == "Mollusca"      ~ "Mollusca",
+    phylum == "Chaetognatha"  ~ "Chaetognatha",
+    phylum == "Cnidaria"      ~ "Cnidaria",
+    phylum == "Ctenophora"    ~ "Ctenophora",
+    class == "Thaliacea"      ~ "Thaliacea",
+    class == "Appendicularia" ~ "Appendicularia",
+    .default = "OTHER")) %>% 
+  relocate(zoopGrp, .before = phylum)
 
   
-  # Count unique classes
+  # Count unique ZoopGrps rates
   datClean %>% 
-    group_by(class) %>% 
-    mutate(countClass = sum(class > 1, na.rm = TRUE)) %>% 
-    distinct(class, countClass) %>% 
-    arrange(countClass)
-      # Good data for:
-        # Copepoda
-        # Malacostraca
-        # Tentaculata
-        # Scyphozoa
-        # Thaliacea and
-        # maybe Sagittoidea and Hydrozoa
+    group_by(zoopGrp) %>% 
+    mutate(countZGrp = sum(zoopGrp > 1, na.rm = TRUE)) %>% 
+    distinct(zoopGrp, countZGrp) %>% 
+    arrange(countZGrp)
+      # Appendicularia         3
+      # Mysida                14
+      # Decapoda              28
+      # Chaetognatha          28
+      # Euphausiacea          34
+      # Thaliacea             34
+      # Amphipoda             63
+      # Cnidaria              68
+      # Ctenophora           132
+      # Copepoda             280
   
   
-    # Check the temperature range for each class
-    datClean %>% 
-      filter(class == "Copepoda") %>% 
-      select(temp_C) %>% 
-      summary()
-    datClean %>% 
-      filter(class == "Malacostraca") %>% 
-      select(temp_C) %>% 
-      summary()
-    datClean %>% 
-      filter(class == "Tentaculata") %>% 
-      select(temp_C) %>% 
-      summary()
-    datClean %>% 
-      filter(class == "Scyphozoa") %>% 
-      select(temp_C) %>% 
-      summary()
-    datClean %>% 
-      filter(class == "Thaliacea") %>% 
-      select(temp_C) %>% 
-      summary()
-    datClean %>% 
-      filter(class == "Sagittoidea") %>% 
-      select(temp_C) %>% 
-      summary()
-    datClean %>% 
-      filter(class == "Hydrozoa") %>% 
-      select(temp_C) %>% 
-      summary()
-        # All have sensible ranges for estimating Q10
+  # Check the temperature range for each zoopGrp
+  datClean %>% 
+    select(zoopGrp, temp_C, rate_name) %>% 
+    group_by(zoopGrp) %>% 
+    summarise( 
+      temp_range = paste0(min(temp_C), "-", max(temp_C)))
+      # All have sensible ranges for estimating Q10, except for Mysids
 
 # End data cleaning ----
 
@@ -157,6 +151,7 @@ glimpse(datFinal)
     ggplot() + 
     geom_point(aes(x = temp_C, 
                    y = log(Cspecific_rate), 
-                   colour = primRef))
-
+                   colour = zoopGrp))
+  
+# Save it as an RDS for later use
 # saveRDS(datFinal, "Data/grwth_dat.rds")

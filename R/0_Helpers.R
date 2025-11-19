@@ -93,12 +93,21 @@ analyse_thermal_sensitivity <- function(model, data,
                                         delta_T = 10, # For Q10 calculation
                                         alpha = 0.05) {
   # Calculate Q10 ----
+    
+    # Define groups and only progress for 1 group at a time
+    grp <- unique(data$zoopGrp)
+    stopifnot(length(grp) == 1)
+    
+    # Number of observations
+    n_obs <- nrow(data)
+    
     # Define temperatures
-    T1 <- median(data[[temp_col]], na.rm = TRUE) # use median because it is the mid point of temperatures
-    T2 <- T1 + delta_T # Take temp1 and add delta_T (i.e., specified temp difference)
-  
+    T1 <- min(data[[temp_col]], na.rm = TRUE) # Take the minimum temperature per group
+    T2 <- T1 + delta_T # Take minimum temp and add specified temperature
+    
     # Create prediction data for just two temps
-    newdat <- data.frame(x = c(1 / T1, 1 / T2)) # A dataframe with JUST the predictor comprising the reciprocals of two temps
+    newdat <- data.frame(x = c(1 / T1, 1 / T2), # A dataframe with JUST the predictor comprising the reciprocals of two temps
+                         zoopGrp = grp) 
   
     # Get predictions with std err
     fit <- predict(model, newdata = newdat, se.fit = TRUE, re.form = NA) # Predict the responses (in ln space) for the two temps
@@ -128,15 +137,17 @@ analyse_thermal_sensitivity <- function(model, data,
       CI_upper = as.numeric(exp(CI_upper_log)),
       T1_C = T1 - 273.15,
       T2_C = T2 - 273.15,
-      se_Q10 = as.numeric(Q10 * se_diff)
+      se_Q10 = as.numeric(Q10 * se_diff),
+      n_obs = n_obs
     )
 
   # Get prediction ribbon for plotting ----
     # Get predictions with standard errors for all temps in dataset
     preds_raw <- predict(model,
-      newdata = data.frame(x = data[[x_col]]),
+      newdata = data.frame(x = data[[x_col]],
+                           zoopGrp = grp),
       se.fit = TRUE,
-      re.form = NA
+      re.form = NA # Maintain population-level predictions (ie., ignore random effects)
     )
   
     # Create dataframe with predictions and CIs

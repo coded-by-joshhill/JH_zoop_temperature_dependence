@@ -101,90 +101,74 @@ datClean <- dat %>%
     mutate(BMC_mg = convert_CW(BM_C, weight_unit)) %>% # harmonize C weight data to mg
     ungroup() %>% 
     relocate(c(phylum, class, order, family, genus), .before = taxa) %>% 
-    relocate(BMC_mg, .after = BM_C)
+    relocate(BMC_mg, .after = BM_C) %>% 
+    mutate(zoopGrp = case_when( # Create custom groupings following Ikeda2014
+      order == "Euphausiacea"   ~ "Euphausiacea",
+      order == "Amphipoda"      ~ "Amphipoda",
+      order == "Decapoda"       ~ "Decapoda",
+      order == "Mysidacea"      ~ "Mysida",
+      class == "Copepoda"       ~ "Copepoda",
+      phylum == "Mollusca"      ~ "Mollusca",
+      phylum == "Chaetognatha"  ~ "Chaetognatha",
+      phylum == "Cnidaria"      ~ "Cnidaria",
+      phylum == "Ctenophora"    ~ "Ctenophora",
+      class == "Thaliacea"      ~ "Thaliacea",
+      class == "Appendicularia" ~ "Appendicularia",
+      .default = "OTHER")) %>% 
+    relocate(zoopGrp, .before = phylum)
 
   
-  # Count unique classes for ClearanceRate
+  # Count unique ZoopGrps rates for ClearanceRate
   datClean %>% 
     filter(rate_name == "ClearanceRate") %>% 
-    group_by(class) %>% 
-    mutate(countClass = sum(class > 1, na.rm = TRUE)) %>% 
-    distinct(class, countClass) %>% 
-    arrange(countClass)
-      # Good data for:
-        # Scyphozoa
-        # Thaliacea
-        # Copepoda
-        # Malacostraca and,
-        # maybe Appendicularia and Tentaculata...
+    group_by(zoopGrp) %>% 
+    mutate(countZGrp = sum(zoopGrp > 1, na.rm = TRUE)) %>% 
+    distinct(zoopGrp, countZGrp) %>% 
+    arrange(countZGrp)
+      # Chaetognatha           4
+      # Ctenophora            58
+      # Appendicularia        60
+      # Euphausiacea         201
+      # Copepoda             243
+      # Thaliacea            286
+      # Cnidaria             334
   
   
-    # Check the temperature range for each class
-    datClean %>% 
-      filter(rate_name == "ClearanceRate", class == "Scyphozoa") %>% 
-      select(temp_C) %>% 
-      summary()
-    datClean %>% 
-      filter(rate_name == "ClearanceRate", class == "Thaliacea") %>% 
-      select(temp_C) %>% 
-      summary()
-    datClean %>% 
-      filter(rate_name == "ClearanceRate", class == "Copepoda") %>% 
-      select(temp_C) %>% 
-      summary()
-    datClean %>% 
-      filter(rate_name == "ClearanceRate", class == "Malacostraca") %>% 
-      select(temp_C) %>% 
-      summary()
-    datClean %>% 
-      filter(rate_name == "ClearanceRate", class == "Appendicularia") %>% 
-      select(temp_C) %>% 
-      summary()
-    datClean %>% 
-      filter(rate_name == "ClearanceRate", class == "Tentaculata") %>% 
-      select(temp_C) %>% 
-      summary()
-      # All have sensible ranges for estimating Q10
+  # Check the temperature range for each zoopGrp
+  datClean %>% 
+    select(zoopGrp, temp_C, rate_name) %>% 
+    group_by(zoopGrp) %>% 
+    filter(rate_name == "ClearanceRate") %>% 
+    summarise( 
+      temp_range = paste0(min(temp_C), "-", max(temp_C)))
+      # All have sensible ranges for estimating Q10, except for Chaetognaths
       
   
   
-  # Count unique classes for IngestionRate
+  # Count unique ZoopGrps rates for IngestionRate
   datClean %>% 
     filter(rate_name == "IngestionRate") %>% 
-    group_by(class) %>% 
-    mutate(countClass = sum(class > 1, na.rm = TRUE)) %>% 
-    distinct(class, countClass) %>% 
-    arrange(countClass)
-      # Good data for:
-        # Copepoda
-        # Malacostraca
-        # Thaliacea
-        # Sagittoidea and,
-        # Maybe Tentaculata
+    group_by(zoopGrp) %>% 
+    mutate(countZGrp = sum(zoopGrp > 1, na.rm = TRUE)) %>% 
+    distinct(zoopGrp, countZGrp) %>% 
+    arrange(countZGrp)
+      # Appendicularia         6
+      # Cnidaria               6
+      # Ctenophora            35
+      # Chaetognatha          79
+      # Thaliacea             81
+      # Euphausiacea          91
+      # Copepoda             173
   
   
-  # Check the temperature range for each class
-    datClean %>% 
-      filter(rate_name == "IngestionRate", class == "Copepoda") %>% 
-      select(temp_C) %>% 
-      summary()
-    datClean %>% 
-      filter(rate_name == "IngestionRate", class == "Malacostraca") %>% 
-      select(temp_C) %>% 
-      summary()
-    datClean %>% 
-      filter(rate_name == "IngestionRate", class == "Thaliacea") %>% 
-      select(temp_C) %>% 
-      summary()
-    datClean %>% 
-      filter(rate_name == "IngestionRate", class == "Sagittoidea") %>% 
-      select(temp_C) %>% 
-      summary()
-    datClean %>% 
-      filter(rate_name == "IngestionRate", class == "Tentaculata") %>% 
-      select(temp_C) %>% 
-      summary()
-        # All except Sagittoidea (17-21 degC) and Tentaculata (10 degC only) have sensible ranges for estimating Q10
+  # Check the temperature range for each zoopGrp
+  datClean %>% 
+    select(zoopGrp, temp_C, rate_name) %>% 
+    group_by(zoopGrp) %>% 
+    filter(rate_name == "IngestionRate") %>% 
+    summarise( 
+      temp_range = paste0(min(temp_C), "-", max(temp_C)))
+      # All have sensible ranges for estimating Q10, except for Cnidaria and Ctenophora
 
 # End data cleaning ----
     
@@ -233,7 +217,8 @@ glimpse(datFinal)
     ggplot() + 
     geom_point(aes(x = temp_C, 
                    y = log(Cspecific_rate), 
-                   colour = order)) +
+                   colour = zoopGrp)) +
     facet_wrap(~ rate_name, scales ="free")
 
+# Save it as an RDS for later use
 # saveRDS(datFinal, "Data/clear_ingest_data.rds")

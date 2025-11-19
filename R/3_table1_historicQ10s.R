@@ -25,7 +25,7 @@ dat <- readRDS("Data/historicQ10_dat.rds") %>%
     order == "Euphausiacea"   ~ "Euphausiacea",
     order == "Amphipoda"      ~ "Amphipoda",
     order == "Decapoda"       ~ "Decapoda",
-    order == "Mysidacea"      ~ "Mysidacea",
+    order == "Mysidacea"      ~ "Mysida",
     class == "Copepoda"       ~ "Copepoda",
     phylum == "Mollusca"      ~ "Mollusca",
     phylum == "Chaetognatha"  ~ "Chaetognatha",
@@ -71,7 +71,7 @@ tableDat <- dat %>%
   select(zoopGrp, Ingestion, Clearance, Respiration, Growth, 
          HouseProduction, ExcretionAmmonia, ExcretionPhosphate) %>% 
   arrange(factor(zoopGrp, levels = c("Copepoda", "Euphausiacea", "Amphipoda", 
-                                     "Decapoda", "Mysidacea", "Chaetognatha", 
+                                     "Decapoda", "Mysida", "Chaetognatha", 
                                      "Cnidaria", "Ctenophora", "Mollusca", 
                                      "Thaliacea", "Appendicularia", "OTHER")))
 
@@ -91,7 +91,7 @@ table1 <- tableDat %>%
     ExcretionAmmonia = html("Ammonia<br>Excretion"),
     ExcretionPhosphate = html("Phosphate<br>Excretion")
   ) %>%
-  fmt_missing(
+  sub_missing(
     columns = everything(),
     missing_text = "—"
   ) %>%
