@@ -16,6 +16,7 @@ library(terra)
 library(sf)
 library(rnaturalearth)
 library(patchwork)
+library(cowplot)
 
 
 
@@ -25,6 +26,7 @@ growDat <- readRDS("Data/grwth_dat.rds")
 respDat <- readRDS("Data/resp_dat.rds")
 Q10Dat <- readRDS("Data/historicQ10_dat.rds")
   
+
   # Assign rate dataframes to an object
   dfs <- list(feedDat, growDat, respDat)
 
@@ -36,25 +38,15 @@ mdat <- reduce(dfs, full_join) %>%
     drop_na(lat, lon) %>% 
     mutate(rate_name = as_factor(rate_name))
   
+  
   # Assign appropriate names for feeding type
   levels(mdat$rate_name) <- c("Clearance", "Ingestion", "Growth", "Respiration") 
   
   
-# Set study area and read in shapefiles ----
-  # Available shp files:
-    # Add url here
-  
-  
 
-# Read in data/shapefiles
-# oceans <- st_read("/Users/jth025/Documents/PhD Local/Local data/Shapefiles/ne_10m_ocean/ne_10m_ocean.shp") %>%
-#   st_transform(crs = "+proj=robin") %>% # transform to Robinson projection
-#   st_make_valid()
-  
-
+# Read in shapefiles ----
 world <- ne_countries(scale = "medium", returnclass = "sf") %>% 
   st_transform(crs = "+proj=robin")
-
 
   
 # Convert rate data to sf for plotting
@@ -62,6 +54,7 @@ pts <- mdat %>%
   drop_na(lat, lon) %>% 
   st_as_sf(coords = c("lon", "lat"), crs = 4326) %>% 
   st_transform(crs = "+proj=robin") # transform point data to Robinson projection
+
 
 # Convert Q10 data to sf for plotting
 Q10pts <- Q10Dat %>% 
@@ -71,6 +64,7 @@ Q10pts <- Q10Dat %>%
   st_as_sf(coords = c("lon", "lat"), crs = 4326) %>% 
   st_transform(crs = "+proj=robin") # transform point data to Robinson projection
 
+
 # Define color palette
 mycols <- c("Clearance" = "#66c2a5", 
             "Ingestion" = "#fc8d62", 
@@ -78,12 +72,14 @@ mycols <- c("Clearance" = "#66c2a5",
             "Respiration" = "#e78ac3",
             "Q10" = "#a6d854")
 
+
 # Create graticules
 graticule <- st_graticule(
   lat = seq(-90, 90, by = 30),
   lon = seq(-180, 180, by = 60),
   crs = 4326) %>%
   st_transform(crs = "ESRI:54030")
+
 
 # Create an outline
 outline <- st_graticule(
@@ -95,7 +91,7 @@ outline <- st_graticule(
 
 
 
-# MAINPLOT ----
+# Main map ----
 mainmap <- ggplot() +
   geom_sf(data = graticule, colour = "lightgrey", linewidth = 0.2) + 
   geom_sf(data = world, fill = "darkgrey", colour = "white", linewidth = 0.1) +
@@ -112,16 +108,30 @@ mainmap <- ggplot() +
   geom_sf(data = outline, fill = NA, colour = "black", linewidth = 0.2) +
   scale_fill_manual(values = mycols) +
   theme_void() +
-  theme(legend.position = "top",
+  theme(legend.position = "none",
         legend.text = element_text(size = 12),
-        legend.title = element_text(size = 14)) +
+        legend.title = element_text(size = 14, face = "bold"),
+        plot.tag = element_text(size = 14, face = "bold")) +
   guides(fill = guide_legend(title = "Data type"),
-         color = guide_legend(title = "Data type")) 
+         color = guide_legend(title = "Data type")) +
+  labs(tag = "(a)")
   
 mainmap
 
+  
+  # Extract legend as a separate ggplot object
+  legend_plot <- as_ggplot(get_legend(
+    mainmap + 
+      guides(fill = guide_legend(
+        title = "Data type",
+        nrow = 5,  # Vertical legend
+        title.position = "top"
+      )) +
+      theme(legend.text = element_text(size = 11),
+            legend.title = element_text(size = 12, face = "bold"))
+  ))
 
-# SUBPLOT 1: Europe ----  
+# Submap 1: Europe ----  
 Europe <- ggplot() +
   geom_sf(data = world, fill = "darkgrey", colour = "white", linewidth = 0.1) +
   geom_sf(data = pts,
@@ -141,12 +151,14 @@ Europe <- ggplot() +
   theme(legend.position = "none",
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14),
-        panel.grid = element_blank())
+        panel.grid = element_blank(),
+        plot.tag = element_text(size = 14, face = "bold")) +
+  labs(tag = "(b)")
 
 Europe
 
 
-# SUBPLOT 2: Northern Oceans
+# Submap 2: Northern Oceans
 NorthOceans <- ggplot() +
   geom_sf(data = world, fill = "darkgrey", colour = "white", linewidth = 0.1) +
   geom_sf(data = pts,
@@ -166,12 +178,15 @@ NorthOceans <- ggplot() +
   theme(legend.position = "none",
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14),
-        panel.grid = element_blank())
+        panel.grid = element_blank(),        
+        plot.tag = element_text(size = 14, face = "bold")) +
+  labs(tag = "(c)")
+        
 
 NorthOceans
 
 
-# SUBPLOT 3: NWPacific
+# Submap 3: NWPacific
 NWPacific <- ggplot() +
   geom_sf(data = world, fill = "darkgrey", colour = "white", linewidth = 0.1) +
   geom_sf(data = pts,
@@ -191,12 +206,14 @@ NWPacific <- ggplot() +
   theme(legend.position = "none",
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14),
-        panel.grid = element_blank())
+        panel.grid = element_blank(),
+        plot.tag = element_text(size = 14, face = "bold")) +
+  labs(tag = "(d)")
 
 NWPacific
 
 
-# SUBPLOT 4: Southern Ocean
+# Submap 4: Southern Ocean
 SOcean <- ggplot() +
   geom_sf(data = world, fill = "darkgrey", colour = "white", linewidth = 0.1) +
   geom_sf(data = pts,
@@ -213,25 +230,30 @@ SOcean <- ggplot() +
   scale_fill_manual(values = mycols) +
   coord_sf(xlim = c(-90, 160), ylim = c(-80, -30), crs = 4326) +
   theme_bw() +
-  theme(legend.position = "none",
+  theme(legend.position = "right",
         legend.text = element_text(size = 12),
-        legend.title = element_text(size = 14),
-        panel.grid = element_blank())
+        legend.title = element_text(size = 14, face = "bold"),
+        panel.grid = element_blank(),
+        plot.tag = element_text(size = 14, face = "bold")) +
+  guides(fill = guide_legend(title = "Data type"),
+         color = guide_legend(title = "Data type")) +
+  labs(tag = "(e)")
 
 SOcean
 
 
 
-# Combine plots
-(Figure_1 <- (mainmap | Europe )/
-  (NorthOceans | NWPacific) /
-  (SOcean) +
-  plot_layout(height = c(2, 1.5, 1)) +
-  # plot_annotation(tag_levels = 'A') &
-  theme(plot.tag = element_text(size = 12, face = "bold")))
+# Combine plots ----
+(Figure_1 <-
+    (mainmap | Europe +
+       plot_layout(widths = c(.5, 1))) /
+    (NorthOceans | NWPacific + 
+       plot_layout(widths = c(.5, .5))) /
+    (SOcean | plot_spacer() + 
+       plot_layout(widths = c(.8, .1))))
+ggsave("Output/Figure_1.png", plot = Figure_1, width = 10, height = 12)
 
-# ggsave("Output/Figure_1.png", plot = Figure_1, width = 10, height = 10)
 
 
-# Using patchwork is like spreading frozen butter on fresh bread... leaving this as is for now...
 
+#** Using patchwork is like spreading frozen butter on fresh bread... leaving this as is for now*

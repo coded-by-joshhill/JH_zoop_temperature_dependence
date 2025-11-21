@@ -53,7 +53,7 @@ usedat <- dat %>%
   # Quickly view distribution of Cspecific_rates by zoopGrp
   usedat %>%
     ggplot(aes(x = Cspecific_rate)) +
-    geom_histogram(bins = 50, fill = "slateblue", color = "black") +
+    geom_histogram(bins = 50, fill = "pink", color = "grey") +
     scale_x_log10() + # use log 10 to see extreme outliers
     facet_wrap(~zoopGrp, scales = "free") + 
     theme_bw() +
@@ -68,12 +68,12 @@ usedat <- dat %>%
 # Convert temp to Kelvin and prep data for model ----
 mdat <- usedat %>% 
     filter(
-      (zoopGrp == "Appendicularia"& Cspecific_rate < 15000) |
-      (zoopGrp == "Cnidaria"     & Cspecific_rate < 5000) |
-      (zoopGrp == "Copepoda"     & Cspecific_rate < 3000) |
-      (zoopGrp == "Ctenophora"   & Cspecific_rate < 10000) |
-      (zoopGrp == "Euphausiacea" & Cspecific_rate < 50) |
-      (zoopGrp == "Thaliacea"    & Cspecific_rate < 5000)) %>%
+      (zoopGrp == "Appendicularia" & Cspecific_rate < 15000) |
+      (zoopGrp == "Cnidaria"       & Cspecific_rate < 5000) |
+      (zoopGrp == "Copepoda"       & Cspecific_rate < 3000) |
+      (zoopGrp == "Ctenophora"     & Cspecific_rate < 10000) |
+      (zoopGrp == "Euphausiacea"   & Cspecific_rate < 50) |
+      (zoopGrp == "Thaliacea"      & Cspecific_rate < 5000)) %>%
     filter(!is.na(temp_C)) %>% 
     mutate(temp_K = temp_C + 273.15,
            x = 1/temp_K,
@@ -84,6 +84,7 @@ mdat %>%
   ggplot() +
   geom_point(aes(x = x, y = y, colour = zoopGrp)) +
   theme_bw()
+
 
 
 
@@ -143,15 +144,14 @@ ratePlot <- mdat %>%
         axis.text = element_text(size = 12)) +
   labs(
     x = expression(bold("Zooplankton group")),
-    y = expression(bold("log Clearance rate (ml mgC"^-1*" h"^-1*")"))) 
+    y = expression(bold("log10 Clearance rate (ml mgC"^-1*" h"^-1*")"))) 
 
 
 # Dot plot of Q10
 Q10plot <- clearanceQ10s %>%
   ggplot(aes(x = Group, y = Q10)) +
+  geom_errorbar(aes(ymin = Q10lwr, ymax = Q10upr), width = 0.2, color = "skyblue") +
   geom_point(size = 3, color = "darkblue") +
-  # geom_errorbar(aes(ymin = Q10lwr, ymax = Q10upr), width = 0.2, color = "darkred") +
-  coord_cartesian(ylim = c(0, 3)) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
         axis.title.x = element_text(size = 14),
@@ -168,7 +168,7 @@ Q10plot <- clearanceQ10s %>%
 # ggsave("Output/Figure_2.png", plot = figure2, width = 12, height = 8)
 
 
-# Produce Arrhenius plots for supplements material ----
+# Produce Arrhenius plots for supplementary material ----
 # Prepare combined data for faceting
 plot_data <- lapply(names(results), function(g) {
   df_data <- mdat %>% filter(zoopGrp == g)

@@ -142,7 +142,6 @@ datClean <- dat %>%
     summarise( 
       temp_range = paste0(min(temp_C), "-", max(temp_C)))
       # All have sensible ranges for estimating Q10, except for Chaetognaths
-      
   
   
   # Count unique ZoopGrps rates for IngestionRate

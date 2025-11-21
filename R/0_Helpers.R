@@ -1,4 +1,4 @@
-# Helper functions for clearance and ingestion data analysis
+# Helper functions for temperature sensitivity data analysis
 # 16/09/25
 # Josh Hill
 
@@ -84,6 +84,26 @@ convert_respiration <- function(rate, unit, genus) {
 # END OF RESPIRATION CONVERTER
 
 
+
+# TAXONOMIC COVERAGE SUMMARY Fn ----
+summarise_taxonomic_coverage <- function(data, dataset_name) {
+  coverage <- data %>%
+    summarise(
+      Dataset = dataset_name,
+      n_species = n_distinct(taxa), # change taxa to species
+      n_genera = n_distinct(genus),
+      n_families = n_distinct(family, na.rm = TRUE),
+      n_orders = n_distinct(order, na.rm = TRUE),
+      n_classes = n_distinct(class, na.rm = TRUE),
+      n_phyla = n_distinct(phylum, na.rm = TRUE),
+      n_observations = n()
+    )
+  return(coverage)
+}
+# END OF TAXONOMIC SUMMARY Fn
+
+
+
 # THERMAL SENSITIVITY ANALYSER ----
 # Calculate Q10 with CI AND prediction ribbons for plotting
 # This function does both calculations at once for efficiency
@@ -91,8 +111,9 @@ analyse_thermal_sensitivity <- function(model, data,
                                         temp_col = "temp_K", # for Q10 calculation
                                         x_col = "x", # for ribbon plotting
                                         delta_T = 10, # For Q10 calculation
-                                        alpha = 0.05) {
-  # Calculate Q10 ----
+                                        alpha = 0.05) # For 95% CI
+  { 
+  #### Calculate Q10 ----
     # Define groups and only progress for 1 group at a time
     grp <- unique(data$zoopGrp)
     stopifnot(length(grp) == 1)
@@ -102,7 +123,7 @@ analyse_thermal_sensitivity <- function(model, data,
     
     # Define temperatures
     T1 <- min(data[[temp_col]], na.rm = TRUE) # Take the minimum temperature per group
-    T2 <- T1 + delta_T # Take minimum temp and add specified temperature
+    T2 <- T1 + delta_T # Take minimum temp and add specified temperature (10 by default)
     
     # Create prediction data for just two temps
     newdat <- data.frame(x = c(1 / T1, 1 / T2), # A dataframe with JUST the predictor comprising the reciprocals of two temps
@@ -142,7 +163,7 @@ analyse_thermal_sensitivity <- function(model, data,
       n_obs = n_obs
     )
 
-  # Get prediction ribbon for plotting ----
+  #### Get prediction ribbon for plotting ----
     # Get predictions with standard errors for all temps in dataset
     preds_raw <- predict(model,
       newdata = data.frame(x = data[[x_col]],
