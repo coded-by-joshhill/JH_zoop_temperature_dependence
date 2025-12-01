@@ -106,7 +106,7 @@ datClean <- dat %>%
       order == "Euphausiacea"   ~ "Euphausiacea",
       order == "Amphipoda"      ~ "Amphipoda",
       order == "Decapoda"       ~ "Decapoda",
-      order == "Mysidacea"      ~ "Mysida",
+      order == "Mysida"         ~ "Mysida",
       class == "Copepoda"       ~ "Copepoda",
       phylum == "Mollusca"      ~ "Mollusca",
       phylum == "Chaetognatha"  ~ "Chaetognatha",

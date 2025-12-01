@@ -83,26 +83,26 @@ taxaDat <- dat %>%
 
 # Join taxa info and harmonize weight data ----
 datClean <- dat %>% 
-  left_join(taxaDat, by = "taxa") %>% 
-  rowwise() %>% 
-  mutate(BMC_mg = convert_CW(BM_C, weight_unit)) %>% # harmonize C weight data to mg
-  ungroup() %>% 
-  relocate(c(phylum, class, order, family, genus), .before = taxa) %>% 
-  relocate(BMC_mg, .after = BM_C) %>% 
-  mutate(zoopGrp = case_when( # Create custom groupings following Ikeda2014
-    order == "Euphausiacea"   ~ "Euphausiacea",
-    order == "Amphipoda"      ~ "Amphipoda",
-    order == "Decapoda"       ~ "Decapoda",
-    order == "Mysida"         ~ "Mysida",
-    class == "Copepoda"       ~ "Copepoda",
-    phylum == "Mollusca"      ~ "Mollusca",
-    phylum == "Chaetognatha"  ~ "Chaetognatha",
-    phylum == "Cnidaria"      ~ "Cnidaria",
-    phylum == "Ctenophora"    ~ "Ctenophora",
-    class == "Thaliacea"      ~ "Thaliacea",
-    class == "Appendicularia" ~ "Appendicularia",
-    .default = "OTHER")) %>% 
-  relocate(zoopGrp, .before = phylum)
+    left_join(taxaDat, by = "taxa") %>% 
+    rowwise() %>% 
+    mutate(BMC_mg = convert_CW(BM_C, weight_unit)) %>% # harmonize C weight data to mg
+    ungroup() %>% 
+    relocate(c(phylum, class, order, family, genus), .before = taxa) %>% 
+    relocate(BMC_mg, .after = BM_C) %>% 
+    mutate(zoopGrp = case_when( # Create custom groupings following Ikeda2014
+      order == "Euphausiacea"   ~ "Euphausiacea",
+      order == "Amphipoda"      ~ "Amphipoda",
+      order == "Decapoda"       ~ "Decapoda",
+      order == "Mysida"         ~ "Mysida",
+      class == "Copepoda"       ~ "Copepoda",
+      phylum == "Mollusca"      ~ "Mollusca",
+      phylum == "Chaetognatha"  ~ "Chaetognatha",
+      phylum == "Cnidaria"      ~ "Cnidaria",
+      phylum == "Ctenophora"    ~ "Ctenophora",
+      class == "Thaliacea"      ~ "Thaliacea",
+      class == "Appendicularia" ~ "Appendicularia",
+      .default = "OTHER")) %>% 
+    relocate(zoopGrp, .before = phylum)
 
   
   # Count unique ZoopGrps rates
