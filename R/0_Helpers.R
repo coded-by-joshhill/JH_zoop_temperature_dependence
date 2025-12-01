@@ -110,6 +110,8 @@ summarise_taxonomic_coverage <- function(data, dataset_name) {
 
 # Calculate Q10 with CI and prediction ribbons for plotting using bootstrapping for confidence intervals
 boot_Q10 <- function(df) {
+  require(glmmTMB, quietly = TRUE)
+  
   df_id <- sample(1:nrow(df), nrow(df), replace = TRUE) # A random sample of rows of df (with replacement) of same size as df
   d <- df[df_id,] # Get those random rows
   out <- glmmTMB(y ~ x * zoopGrp + (1|primRef) + (1|taxa),  data = d) # fit the model
@@ -229,12 +231,15 @@ arrhenius_plot <- function(mdat, rate_col, boot_models, Q10pdat,
     df_pred <- results[[g]]$predictions
     df_Q10 <- results[[g]]$Q10
     
+    #Calculate sample size and number of taxa
+    n_obs <- nrow(df_data)
+
     list(
       data = df_data %>% mutate(zoopGrp = g),
       pred = df_pred %>% mutate(zoopGrp = g),
       Q10_label = paste0("Q10 = ", round(df_Q10$Q10, 2),
                          " (95% CI: ", round(df_Q10$CI_lower, 2), " - ",
-                         round(df_Q10$CI_upper, 2), ")")
+                         round(df_Q10$CI_upper, 2), "); n = ", n_obs)
     )
   })
   
