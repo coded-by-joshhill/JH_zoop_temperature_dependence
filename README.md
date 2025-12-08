@@ -10,23 +10,68 @@ The rate process data for this project consists of respiration, ingestion and cl
 
 Here we save data files such as RDS and/or small csv files. Other data used in the analysis are provided via web links.
 
+| Files | Description |
+|------------------|------------------------------------------------------|
+| xyz_data.rds | These data files are cleaned rate process and Q10 data. |
+| Q10_estimates_xyz.rds | These files are Q10 estimate output generated using bootstrap models. |
+| Q10_summary_xyz.rds | These files are Q10 summaries which include Q10 estimates and confidence intervals which are estimated using the bootstrap models output. |
+|  |  |
+
 ## R
 
-This folder holds all scripts that are used to complete data cleaning and analysis. Explanations of each script are as follows:
+This folder contains all .R scripts that are used to perform data cleaning and analysis. Explanations of each script are outlined below:
 
--   0_Helpers: This script is a home for custom functions. Some of these functions help clean the data and estimate Q10s.
+-   **0_Helpers:** This script is a source file which stores custom functions used throughout data cleaning and analyses phases.
 
--   1_Scripts: These scripts harmoise and clean the original data so that all rate processes are in a common unit and all carbon weights are in the same unit. These scripts also convert rate processes to mass-specific rates for estimating Q10s.
+-   **1.1_cleaning_feeding_data:** This script harmonises and cleans the raw rate process (ingestion and clearance) data so that all rates are in a common unit, and all carbon weights are in the same unit (mg). This script also converts feeding rates to mass-specific rates in preparation for estimating temperature dependence (using Q~10~).
 
--   2_Script: Here we use the lat, lon of each recorded rate to create a map to illustrate the global distribution of rates which are used to estimate Q10 values and historic Q10 values.
+    -   First, we assign unique identifier to each row specific to the dataset.
 
--   3_Script: This script summarises the compiled historic Q10 values for zooplankton and reports them in a table.
+    -   Subset the data by taxa (genus or species depending on the record), extract AphiaIDs using the World Register of Marine Species *(worrms)* package. Add taxon classifications using AphiaIDs.
 
--   4_Script: This script is a work in progress... here we read in the feeding data and prepare it for analysis. We then generate a model to estimate Q10s based on the population-level slopes of each zooplankton group. We then plot those Q10s and some supplementary material Arrhenius plots.
+    -   Create customised groupings for all zooplankton groups following similar naming conventions to Ikeda (2014) and Kiørboe and Hirst (2014).
+
+    -   Harmonise and clean the data using conversion functions in the 0_Helpers.R source file.
+
+    -   Convert harmonised rates to carbon mass-specific rate using functions in the 0_Helper.R source file.
+
+    -   Finally, save the data as an RDS file for later use.
+
+-   **1.2_cleaning_growth_data:** This script follows script 1.1 format and workflow to harmonise and clean growth rate data.
+
+-   **1.3_cleaning_respiration_data:** This script follows script 1.1 format and workflow to harmonise and clean respiration rate data.
+
+-   **1.4_cleaning_Q10_data:** This script follows a similar format and workflow to script 1.1-3 to clean historic Q~10~ data.
+
+-   **1.5_assess_taxonomic_coverage:** This script is a work in progress... but is planned to read all datasets in, subset by taxa and perform a taxonomic coverage assessment to resolve zooplankton species bias across rates and zooplankton groups.
+
+-   **2_mapping_the_experiments:** First, this script loads all rate process datasets and historic Q~10~ data. Reads in shapefiles using the *rnaturalearth* package. Converts compiled data lat/lon's to sf for plotting. Finally, generates a series of maps to illustrate the distribution of rate processes and historic temperature dependence data across the Earth.
+
+-   **3_table1_historicQ10_data**: This script summarises the compiled historic Q~10~ values for zooplankton and reports them in a table using the *gt* package.
+
+-   **4_Q10_models_Clearance:** This script reads in and filters feeding data by clearance rate and estimates temperature dependence. To do this:
+
+    -   First, we filter the data to exclude zooplankton groups that do not have a suitable number of samples or temperature ranges For example, no less than 20 samples and a temperature range of at least 5 degrees Celcius.
+
+    -   Second, we exclude rate processes that are not biologically reasonable (or are extreme outliers), convert temperature to 1/Kelvin and log the carbon mass-specific rates.
+
+    -   Third, we use bootstrap resampling (n = 9,999) and parellel processing with the package *purrr* to fit Generalised Linear Mixed Models with the Template Model Builder (using the *glmmTMB* package) with zooplankton group as a fixed effect and two random effects (primary author and taxa).
+
+    -   Fourth, we extract the slopes from all models for each zoopGroup and estimate median Q~10~ coefficients following the Arrhenius equation.
+
+    -   Fifth, we estimate the 95% confidence intervals for Q~10~ estimates using coefficients from the boostrap models output.
+
+    -   Finally, we plot the results in a dot plot and violin plot to illustrate median Q~10~ (95% confidence intervals) and the variance of mass-specific clearance rate for each zooplankton group. We then generate inverse Arrhenius plots to illustrate the relationship between temperature and carbon mass-specific clearance rates for each zooplankton group available.
+
+-   **5_Q10_models_Ingestion:** This script follows the same workflow as script 4, but for ingestion rate.
+
+-   **6_Q10_models_Growth:** This script follows the same workflow as script 4, but for growth rate.
+
+-   **7_Q10_models_Respiration:** This script follows the same workflow as script 4, but for respiration.
 
 ## Output
 
-Here we save any core outputs such as preliminary figures etc.
+A folder to save any outputs such as preliminary figures and tables etc.
 
 ## Quarto
 

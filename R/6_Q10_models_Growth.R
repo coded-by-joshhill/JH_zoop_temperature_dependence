@@ -1,12 +1,11 @@
-# Calculating clearance rate Q10s and plotting
+# Calculating growth rate Q10s and plotting
 # Josh Hill
-# 26/11/25
+# 8/12/25
 
 
 
-  # Here I read in clean feeding rate data
+  # Here I read in clean growth rate data
   # Subset the data by target groups
-  # Subset by rate type (clearance)
   # Calculate interspecific Q10s
   # Save those Q10s and variance into a dataframe
   # Plot the Q10s and C-specific rates for available groups
@@ -25,7 +24,7 @@ source("R/0_Helpers.R")
 
 
 # Read in the data ----
-dat <- readRDS("Data/clear_ingest_data.rds") %>% 
+dat <- readRDS("Data/grwth_dat.rds") %>% 
   mutate(zoopGrp = as.factor(zoopGrp)) # set to factor
 
 
@@ -33,7 +32,6 @@ dat <- readRDS("Data/clear_ingest_data.rds") %>%
   dat %>% 
     select(zoopGrp, temp_C, rate_name) %>% 
     group_by(zoopGrp) %>% 
-    filter(rate_name == "ClearanceRate") %>% 
     summarise( 
       temp_range = paste0(min(temp_C), "-", max(temp_C)))
   
@@ -41,7 +39,6 @@ dat <- readRDS("Data/clear_ingest_data.rds") %>%
 
 # Exclude data and prep for analysis ----
 usedat <- dat %>% 
-    filter(rate_name == "ClearanceRate") %>%
     group_by(zoopGrp) %>% 
     filter(n() >= 20, # Exclude zoopGrps that don't have suitable data or temp ranges
            max(temp_C) - min(temp_C) >= 5) %>% 
@@ -61,25 +58,27 @@ usedat <- dat %>%
     labs(
       x = "Clearance rate (Cspecific_rate, log10 scale)",
       y = "Count",
-      title = "Distribution of Cspecific_rate for each zooplankton group")
+      title = "Distribution of Cspecific_rate for each zooplankton group") +
+    scale_x_continuous(labels = function(x) format(x, scientific = FALSE))
       # I will use this to remove extreme outliers, particularly those that don't make biological sense
 
   
 # Custom grouping order 
-group_order <- c("Euphausiacea", "Copepoda", "Ctenophora", 
-                 "Cnidaria", "Thaliacea", "Appendicularia")
+group_order <- c("Amphipoda", "Euphausiacea", "Copepoda", "Chaetognatha", "Ctenophora", 
+                 "Cnidaria", "Thaliacea")
 
   
   
 # Convert temp to Kelvin and prep data for modelling ----
 mdat <- usedat %>% 
-    filter( # exclude values that are not biologically reasonable
-      (zoopGrp == "Appendicularia" & Cspecific_rate < 15000) |
-      (zoopGrp == "Cnidaria"       & Cspecific_rate < 5000) |
-      (zoopGrp == "Copepoda"       & Cspecific_rate < 3000) |
-      (zoopGrp == "Ctenophora"     & Cspecific_rate < 10000) |
-      (zoopGrp == "Euphausiacea"   & Cspecific_rate < 50) |
-      (zoopGrp == "Thaliacea"      & Cspecific_rate < 5000)) %>%
+    filter( # exclude values that are not biologically reasonable and remove extreme outliers
+      (zoopGrp == "Amphipoda"        & Cspecific_rate < 0.007) |
+      (zoopGrp == "Euphausiacea"     & Cspecific_rate < 0.004) |
+      (zoopGrp == "Copepoda"         & Cspecific_rate < 0.05) |
+      (zoopGrp == "Chaetognatha"     & Cspecific_rate < 0.004) |
+      (zoopGrp == "Ctenophora"       & Cspecific_rate < 0.04 & Cspecific_rate > 0.00001) |
+      (zoopGrp == "Cnidaria"         & Cspecific_rate < 0.025) |
+      (zoopGrp == "Thaliacea"        & Cspecific_rate < 0.005)) %>% 
     filter(!is.na(temp_C)) %>% 
     mutate(temp_K = temp_C + 273.15,
            x = 1/temp_K,
@@ -110,7 +109,6 @@ boot_models <- map(1:9999, in_parallel(\(x) boot_Q10(mdat),
                                       glmmTMB = glmmTMB,
                                       mdat = mdat)) 
 
-
 # Get Q10 estimates from bootstrap models... this takes even longer :)
 Q10_estimates <- boot_models |>
   map_dfr(in_parallel(\(df) get_Q10s(df), 
@@ -130,8 +128,8 @@ Q10_estimates <- boot_models |>
 mirai::daemons(0)
 
 # Save as RDS
-# saveRDS(Q10_estimates, "Data/Q10_estimates_clearance.rds") # estimates
-# saveRDS(Q10pdat, "Data/Q10_summary_clearance.rds") # median and confidence intervals
+# saveRDS(Q10_estimates, "Data/Q10_estimates_growth.rds") # estimates
+# saveRDS(Q10pdat, "Data/Q10_summary_growth.rds") # median and confidence intervals
 
 
 
@@ -155,7 +153,7 @@ Q10plot <- Q10pdat %>%
         axis.text = element_text(size = 12)) +  
   labs(
     x = expression(bold("Zooplankton group")),
-    y = expression(bold("Clearance rate Q"[10])))
+    y = expression(bold("Growth rate Q"[10])))
 
 
 
@@ -172,13 +170,13 @@ ratePlot <- mdat %>%
         axis.text = element_text(size = 12)) +
   labs(
     x = expression(bold("Zooplankton group")),
-    y = expression(bold("log Clearance rate (ml mgC"^-1*" h"^-1*")"))) 
+    y = expression(bold("log Growth rate (mgC mgC"^-1*" h"^-1*")"))) 
 
 
 (figure2 <- Q10plot + ratePlot +
   plot_layout(axis_titles = "collect_x"))
 
-# ggsave("Output/Figure_2_Clearance.png", plot = figure2, width = 12, height = 8)
+# ggsave("Output/Figure_2_Growth.png", plot = figure2, width = 12, height = 8)
 
 
 
@@ -194,15 +192,15 @@ results <- get_results(mdat, groups, coefs_list, Q10pdat)
 
 
 # Plot it up
-clearance_plot <- arrhenius_plot(
+growth_plot <- arrhenius_plot(
   mdat = mdat,
   rate_col = "Cspecific_rate",
   boot_models = boot_models,
   Q10pdat = Q10pdat,
   group_order = group_order,
   x_limits = c(0.0037, 0.0033)) +
-  labs(y = expression(bold("Clearance rate (ml mgC"^-1*" h"^-1*")")))
+  labs(y = expression(bold("Growth rate (mgC mgC"^-1*" h"^-1*")")))
 
-clearance_plot
+growth_plot
 
-# ggsave("Output/Figure_Supp1.png", plot = clearance_plot, width = 12, height = 8)
+# ggsave("Output/Figure_Supp3.png", plot = growth_plot, width = 12, height = 4)

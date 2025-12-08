@@ -18,22 +18,30 @@ source("R/0_Helpers.R")
 
 
 # Read in the data ----
-feeding <- readRDS("Data/clear_ingest_data.rds")
-respiration <- readRDS("Data/resp_dat.rds")
+clearance <- readRDS("Data/clear_ingest_data.rds") %>% 
+  filter(rate_name == "ClearanceRate",
+         !taxa == "Unknown")
+ingestion <- readRDS("Data/clear_ingest_data.rds") %>% 
+  filter(rate_name == "IngestionRate",
+         !taxa == "Unknown")
 growth <- readRDS("Data/grwth_dat.rds")
+respiration <- readRDS("Data/resp_dat.rds")
 
 
 
 # Taxonomic coverage summary ----
 # Assess the taxonomic breadth of each dataset to demonstrate coverage of major zooplankton lineages
 
-# Calculate coverage for each dataset
-feeding_coverage <- summarise_taxonomic_coverage(feeding, "Feeding")
-respiration_coverage <- summarise_taxonomic_coverage(respiration, "Respiration")
+# Calculate coverage for each dataset using custom function
+  # Takes the dataset and assigns a dataset name
+clearance_coverage <- summarise_taxonomic_coverage(clearance, "Clearance")
+ingestion_coverage <- summarise_taxonomic_coverage(ingestion, "Ingestion")
 growth_coverage <- summarise_taxonomic_coverage(growth, "Growth")
+respiration_coverage <- summarise_taxonomic_coverage(respiration, "Respiration")
+
 
 # Combine into summary table
-taxonomic_coverage <- bind_rows(feeding_coverage, respiration_coverage, growth_coverage)
+taxonomic_coverage <- bind_rows(clearance_coverage, ingestion_coverage, growth_coverage, respiration_coverage)
 
 taxonomic_coverage
 
@@ -42,23 +50,20 @@ coverage_table <- taxonomic_coverage %>%
   gt() %>%
   cols_label(
     Dataset = "Rate Process",
-    n_species = "Species",
+    n_taxon = "Taxa",
     n_genera = "Genera",
     n_families = "Families",
     n_orders = "Orders",
     n_classes = "Classes",
     n_phyla = "Phyla",
-    n_observations = "Observations"
-  ) %>%
+    n_observations = "Observations") %>%
   tab_header(
     title = "Taxonomic coverage across rate processes",
-    subtitle = "Number of unique taxonomic units represented in each dataset"
-  ) %>%
+    subtitle = "Number of unique taxonomic units represented in each dataset") %>%
   cols_align(align = "center", columns = -Dataset) %>%
   tab_options(
     table.font.size = px(17),
     table.width = pct(100),
-    
     table.border.top.style = "solid",
     table.border.top.width = px(2),
     table.border.top.color = "black",
@@ -69,25 +74,22 @@ coverage_table <- taxonomic_coverage %>%
     table_body.border.bottom.color = "black", 
     table_body.hlines.style = "none",
     
-    
     heading.border.bottom.style = "solid",
     heading.border.bottom.width = px(2),
     heading.border.bottom.color = "black",
     
     column_labels.font.weight = "bold",
-    
     column_labels.border.top.style = "solid",
     column_labels.border.top.width = px(2),
     column_labels.border.top.color = "black",
     column_labels.border.bottom.style = "solid",
     column_labels.border.bottom.width = px(2),
-    column_labels.border.bottom.color = "black"
-  )
+    column_labels.border.bottom.color = "black")
 
 coverage_table
 
 # Save the table
-gtsave(coverage_table, "Output/taxonomic_coverage_table.png", vwidth = 1000, vheight = 400)
+# gtsave(coverage_table, "Output/taxonomic_coverage_table.png", vwidth = 1000, vheight = 400)
 
 
 
@@ -96,7 +98,7 @@ gtsave(coverage_table, "Output/taxonomic_coverage_table.png", vwidth = 1000, vhe
 
 
 # Calculate for each dataset
-feeding_by_group <- feeding %>%
+clearance_by_group <- clearance %>%
   group_by(zoopGrp) %>% 
   summarise(dataset = "Feeding",
             n_species = n_distinct(taxa),

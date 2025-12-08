@@ -88,19 +88,19 @@ taxaDat <- dat %>%
     select(taxa, rank, scientificname) %>%
     pivot_wider(names_from = rank,
                 values_from = scientificname) %>% 
-    select(taxa, Phylum, Class, Order, Family, Genus) %>% # only keep necessary columns
+    select(taxa, Phylum, Class, Order, Family, Genus, Species) %>% # only keep necessary columns
     clean_names(case = "snake")
 
   
 
-# Join taxa info and harmonize weight data ----
+# Join taxa info and harmonise weight data ----
 datClean <- dat %>% 
     filter(!taxa %in% "Unknown") %>% # remove the "unknown" species 
     left_join(taxaDat, by = "taxa") %>% 
     rowwise() %>% 
     mutate(BMC_mg = convert_CW(BM_C, weight_unit)) %>% # harmonize C weight data to mg
     ungroup() %>% 
-    relocate(c(phylum, class, order, family, genus), .before = taxa) %>% 
+    relocate(c(phylum, class, order, family, genus, species), .before = taxa) %>% 
     relocate(BMC_mg, .after = BM_C) %>% 
     mutate(zoopGrp = case_when( # Create custom groupings following Ikeda2014
       order == "Euphausiacea"   ~ "Euphausiacea",

@@ -90,13 +90,14 @@ convert_respiration <- function(rate, unit, genus) {
 summarise_taxonomic_coverage <- function(data, dataset_name) {
   coverage <- data %>%
     summarise(
-      Dataset = dataset_name,
-      n_species = n_distinct(taxa), # change taxa to species
-      n_genera = n_distinct(genus),
+      Dataset    = dataset_name,
+      n_taxon    = n_distinct(taxa), 
+      n_species  = n_distinct(species),
+      n_genera   = n_distinct(genus),
       n_families = n_distinct(family, na.rm = TRUE),
-      n_orders = n_distinct(order, na.rm = TRUE),
-      n_classes = n_distinct(class, na.rm = TRUE),
-      n_phyla = n_distinct(phylum, na.rm = TRUE),
+      n_orders   = n_distinct(order, na.rm = TRUE),
+      n_classes  = n_distinct(class, na.rm = TRUE),
+      n_phyla    = n_distinct(phylum, na.rm = TRUE),
       n_observations = n()
     )
   return(coverage)
