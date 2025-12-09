@@ -89,6 +89,8 @@ mdat %>%
   geom_point(aes(x = x, y = y, colour = zoopGrp)) +
   theme_bw()
 
+# saveRDS(mdat, "Data/respiration_mdat.rds") # save modelling dataframe for plotting
+
 
 
 # Fit the bootstrap models using parallel processing ----
@@ -201,4 +203,4 @@ respiration_plot <- arrhenius_plot(
 
 respiration_plot
 
-# ggsave("Output/Figure_Supp3.png", plot = respiration_plot, width = 12, height = 4)
+# ggsave("Output/Figure_Supp4.png", plot = respiration_plot, width = 12, height = 4)

@@ -92,6 +92,8 @@ mdat %>%
   geom_point(aes(x = x, y = y, colour = zoopGrp)) +
   theme_bw()
 
+# saveRDS(mdat, "Data/clearance_mdat.rds") # save modelling dataframe for plotting
+
 
 
 # Fit the bootstrap models using parallel processing ----

@@ -30,17 +30,17 @@ respiration <- readRDS("Data/resp_dat.rds")
 
 
 # Taxonomic coverage summary ----
-# Assess the taxonomic breadth of each dataset to demonstrate coverage of major zooplankton lineages
+  # Simple assessment of the taxonomic coverage of each dataset
 
 # Calculate coverage for each dataset using custom function
-  # Takes the dataset and assigns a dataset name
+  # The function takes the dataset and assigns a dataset name and calculates simple summaries
 clearance_coverage <- summarise_taxonomic_coverage(clearance, "Clearance")
 ingestion_coverage <- summarise_taxonomic_coverage(ingestion, "Ingestion")
 growth_coverage <- summarise_taxonomic_coverage(growth, "Growth")
 respiration_coverage <- summarise_taxonomic_coverage(respiration, "Respiration")
 
 
-# Combine into summary table
+# Combine outputs into a summary table
 taxonomic_coverage <- bind_rows(clearance_coverage, ingestion_coverage, growth_coverage, respiration_coverage)
 
 taxonomic_coverage
@@ -51,6 +51,7 @@ coverage_table <- taxonomic_coverage %>%
   cols_label(
     Dataset = "Rate Process",
     n_taxon = "Taxa",
+    n_species = "Species",
     n_genera = "Genera",
     n_families = "Families",
     n_orders = "Orders",
@@ -100,16 +101,16 @@ coverage_table
 # Calculate for each dataset
 clearance_by_group <- clearance %>%
   group_by(zoopGrp) %>% 
-  summarise(dataset = "Feeding",
-            n_species = n_distinct(taxa),
+  summarise(dataset = "Clearance",
+            n_species = n_distinct(species),
             n_observations = n(),
             .groups = "drop") %>% 
   arrange(-n_species)
-  
-respiration_by_group <- respiration %>% 
+
+ingestion_by_group <- ingestion %>%
   group_by(zoopGrp) %>% 
-  summarise(dataset = "Respiration",
-            n_species = n_distinct(taxa),
+  summarise(dataset = "Ingestion",
+            n_species = n_distinct(species),
             n_observations = n(),
             .groups = "drop") %>% 
   arrange(-n_species)
@@ -121,43 +122,58 @@ growth_by_group <- growth %>%
             n_observations = n(),
             .groups = "drop") %>% 
   arrange(-n_species)
+  
+respiration_by_group <- respiration %>% 
+  group_by(zoopGrp) %>% 
+  summarise(dataset = "Respiration",
+            n_species = n_distinct(species),
+            n_observations = n(),
+            .groups = "drop") %>% 
+  arrange(-n_species)
+
 
   # Print summaries
-  feeding_by_group
+  clearance_by_group
+  ingestion_by_group
   respiration_by_group
   growth_by_group
 
   
-# Combine the summaries and create visualisation
-all_groups <- bind_rows(feeding_by_group, respiration_by_group, growth_by_group) %>%
-  mutate(Dataset = factor(dataset, levels = c("Feeding", "Growth", "Respiration")))
 
-# Create visualisation
-p_composition <- ggplot(all_groups, aes(x = reorder(zoopGrp, n_species), y = n_species, fill = Dataset)) +
+# Combine the summaries and plot it up ----
+all_groups <- bind_rows(clearance_by_group, ingestion_by_group, respiration_by_group, growth_by_group) %>%
+  mutate(Dataset = factor(dataset, levels = c("Clearance", "Ingestion", "Growth", "Respiration")))
+
+  
+# Define color palette
+mycols <- c("Clearance" = "#66c2a5", "Ingestion" = "#fc8d62", "Growth" = "#8da0cb", "Respiration" = "#e78ac3")
+  
+
+# Create plot
+p_composition <- ggplot(all_groups, 
+                        aes(x = reorder(zoopGrp, n_species), y = n_species, fill = Dataset)) +
   geom_col(position = "dodge", width = 0.7) +
   geom_text(aes(label = n_species), 
             position = position_dodge(width = 0.7), 
             hjust = -0.2, size = 3) +
-  scale_fill_manual(values = c("Feeding" = "#66c2a5", "Growth" = "#8da0cb", "Respiration" = "#e78ac3")) +
+  scale_fill_manual(values = mycols) +
   coord_flip() +
-  labs(
-    title = "Taxonomic composition across rate processes",
-    subtitle = "Number of species per zooplankton group",
-    x = "Zooplankton group",
-    y = "Number of species"
-  ) +
-  theme_minimal(base_size = 12) +
-  theme(
-    plot.title = element_text(face = "bold", size = 14),
-    plot.subtitle = element_text(size = 11, colour = "grey30"),
-    legend.position = "bottom",
-    panel.grid.major.y = element_blank()
-  )
+  labs(x = "Zooplankton group",
+       y = "Number of species") +
+  theme_bw(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", size = 14),
+        plot.subtitle = element_text(size = 11, colour = "grey30"),
+        legend.position = "bottom",
+        panel.grid.major.y = element_blank())
 
 p_composition
 
 # Save it
-ggsave("Output/taxonomic_composition.png", p_composition, width = 10, height = 8, dpi = 300, bg = "white")
+# ggsave("Output/taxonomic_composition.png", p_composition, width = 10, height = 8, dpi = 300, bg = "white")
+
+
+
+# 
 
 
 
