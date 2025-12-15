@@ -92,8 +92,6 @@ mdat %>%
   geom_point(aes(x = x, y = y, colour = zoopGrp)) +
   theme_bw()
 
-# saveRDS(mdat, "Data/clearance_mdat.rds") # save modelling dataframe for plotting
-
 
 
 # Fit the bootstrap models using parallel processing ----
@@ -131,56 +129,12 @@ Q10_estimates <- boot_models |>
 # Tear down existing daemons
 mirai::daemons(0)
 
+Q10pdat
+
 # Save as RDS
 # saveRDS(Q10_estimates, "Data/Q10_estimates_clearance.rds") # estimates
-# saveRDS(Q10pdat, "Data/Q10_summary_clearance.rds") # median and confidence intervals
-
-
-
-  
-# Plot it up ---- 
-
-# Dot plot of Q10
-Q10plot <- Q10pdat %>%
-  ggplot() +
-  geom_errorbar(aes(x = Group, ymin = lower_CI, ymax = upper_CI),
-                width = .1,
-                colour = "skyblue") +
-  geom_point(aes(x = Group, y = median),
-             size = 3,
-             colour = "darkblue") +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        axis.title.x = element_text(size = 14),
-        axis.title.y = element_text(size = 14),
-        axis.title.x.top = element_text(size = 14, face = "bold"),
-        axis.text = element_text(size = 12)) +  
-  labs(
-    x = expression(bold("Zooplankton group")),
-    y = expression(bold("Clearance rate Q"[10])))
-
-
-
-# Violin plot of log(Cspecific_rate)
-ratePlot <- mdat %>%
-  ggplot(aes(x = zoopGrp, y = log(Cspecific_rate))) +
-  geom_violin(fill = "skyblue", alpha = 0.5) +
-  geom_jitter(width = 0.2, alpha = 0.3, size = 1) + 
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        axis.title.x = element_text(size = 14),
-        axis.title.y = element_text(size = 14),
-        axis.title.x.top = element_text(size = 14, face = "bold"),
-        axis.text = element_text(size = 12)) +
-  labs(
-    x = expression(bold("Zooplankton group")),
-    y = expression(bold("log Clearance rate (ml mgC"^-1*" h"^-1*")"))) 
-
-
-(figure2 <- Q10plot + ratePlot +
-  plot_layout(axis_titles = "collect_x"))
-
-# ggsave("Output/Figure_2_Clearance.png", plot = figure2, width = 12, height = 8)
+# saveRDS(mdat, "Data/clearance_mdat.rds") # save modelling dataframe for plotting
+# saveRDS(Q10pdat, "Data/Q10_summary_clearance.rds") # save for median and confidence intervals
 
 
 
@@ -193,7 +147,6 @@ groups <- levels(mdat$zoopGrp)
 
 # Extract results using get_results function
 results <- get_results(mdat, groups, coefs_list, Q10pdat)
-
 
 # Plot it up
 clearance_plot <- arrhenius_plot(

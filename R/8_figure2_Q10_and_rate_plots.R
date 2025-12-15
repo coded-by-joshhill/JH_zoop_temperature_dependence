@@ -84,7 +84,7 @@ mdat <- readRDS("Data/growth_mdat.rds")
   ratePlot <- plotRates(mdat, data_type = "Growth", colours = mycols) +
     theme(axis.text.x = element_blank()) +
     theme(axis.title.x = element_blank()) +
-    labs(y = expression(bold("Growth rate (mgC mgC"^-1*" h"^-1*")")))
+    labs(y = expression(bold("Growth rate ln(mgC mgC"^-1*" h"^-1*")")))
   ratePlot
   
 (growthPlots <- ratePlot / Q10plot +
@@ -106,7 +106,7 @@ mdat <- readRDS("Data/respiration_mdat.rds")
   ratePlot <- plotRates(mdat, data_type = "Respiration", colours = mycols) +
     theme(axis.text.x = element_blank()) +
     theme(axis.title.x = element_blank()) +
-    labs(y = expression(bold("Respiration rate (" * mu * "LO"[2] * " mgC"^-1 * " h"^-1 * ")")))
+    labs(y = expression(bold("Respiration rate ln(" * mu * "LO"[2] * " mgC"^-1 * " h"^-1 * ")")))
   ratePlot
   
 (respirationPlots <- ratePlot / Q10plot +
@@ -125,31 +125,5 @@ jointPlots <- annotate_figure(jointPlots,
 jointPlots
 
 # Save it
-ggsave("Output/Figure_2.png", plot = jointPlots, width = 15, height = 8, background = "white")
+# ggsave("Output/Figure_2.png", plot = jointPlots, width = 15, height = 8, background = "white")
 
-#### Working on the below #### 
-
-# Create Arrhenius plots ----
-# Extract coefficients from all bootstrap models
-coefs_list <- map(boot_models, ~fixef(.x)$cond)
-
-# Get all zooplankton groups
-groups <- levels(mdat$zoopGrp)
-
-# Extract results using get_results function
-results <- get_results(mdat, groups, coefs_list, Q10pdat)
-
-
-# Plot it up
-clearance_plot <- arrhenius_plot(
-  mdat = mdat,
-  rate_col = "Cspecific_rate",
-  boot_models = boot_models,
-  Q10pdat = Q10pdat,
-  group_order = group_order,
-  x_limits = c(0.0037, 0.0033)) +
-  labs(y = expression(bold("Clearance rate (ml mgC"^-1*" h"^-1*")")))
-
-clearance_plot
-
-# ggsave("Output/Figure_Supp1.png", plot = clearance_plot, width = 12, height = 8)

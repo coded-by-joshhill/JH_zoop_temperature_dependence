@@ -188,7 +188,7 @@ get_results <- function(df, groups, coefs_list, Q10pdat) {
     })
     
     # Summarise predictions across all bootstrap iterations
-    # Gives us the median prediction and confidence intervals
+    # Give me the median prediction and confidence intervals
     pred_summary <- preds %>%
       filter(!is.na(predicted)) %>%
       group_by(x) %>%
@@ -281,7 +281,7 @@ arrhenius_plot <- function(mdat, rate_col, boot_models, Q10pdat,
     geom_point(data = all_data, aes(x = x, y = .data[[rate_col]]), 
                alpha = 0.3, size = 2) +
     geom_ribbon(data = all_pred, aes(x = x, ymin = conf.low, ymax = conf.high),
-                fill = "skyblue", alpha = 0.3) +
+                fill = "grey", alpha = 0.3) +
     geom_line(data = all_pred, aes(x = x, y = predicted), 
               colour = "darkblue", linewidth = 1, linetype = "dashed") +
     geom_text(data = all_labels, aes(x = x, y = y, label = label), 

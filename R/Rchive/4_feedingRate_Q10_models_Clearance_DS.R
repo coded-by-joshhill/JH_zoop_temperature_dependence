@@ -1,5 +1,5 @@
 # Calculating clearance rate Q10s and plotting
-# Josh Hill
+# Josh Hill - Dave.S
 # 19/11/25
 
 

@@ -98,12 +98,12 @@ mainmap <- ggplot() +
   geom_sf(data = pts,
           aes(fill = rate_name),
           shape = 21,
-          colour = "#404040",
+          colour = "#404040", alpha = 0.5,
           size = 2) +
   geom_sf(data = Q10pts,
           aes(fill = Q10),
           shape = 25,
-          colour = "#404040",
+          colour = "#404040", alpha = 0.5,
           size = 2) +
   geom_sf(data = outline, fill = NA, colour = "black", linewidth = 0.2) +
   scale_fill_manual(values = mycols) +
@@ -137,12 +137,12 @@ Europe <- ggplot() +
   geom_sf(data = pts,
           aes(fill = rate_name),
           shape = 21,
-          colour = "#404040",
+          colour = "#404040", alpha = 0.5,
           size = 2) +
   geom_sf(data = Q10pts,
           aes(fill = Q10),
           shape = 25,
-          colour = "#404040",
+          colour = "#404040", alpha = 0.5,
           size = 2) +
   geom_sf(data = outline, fill = NA, colour = "black", linewidth = 0.2) +
   scale_fill_manual(values = mycols) +
@@ -164,12 +164,12 @@ NorthOceans <- ggplot() +
   geom_sf(data = pts,
           aes(fill = rate_name),
           shape = 21,
-          colour = "#404040",
+          colour = "#404040", alpha = 0.5,
           size = 2) +
   geom_sf(data = Q10pts,
           aes(fill = Q10),
           shape = 25,
-          colour = "#404040",
+          colour = "#404040", alpha = 0.5,
           size = 2) +
   geom_sf(data = outline, fill = NA, colour = "black", linewidth = 0.2) +
   scale_fill_manual(values = mycols) +
@@ -192,12 +192,12 @@ NWPacific <- ggplot() +
   geom_sf(data = pts,
           aes(fill = rate_name),
           shape = 21,
-          colour = "#404040",
+          colour = "#404040", alpha = 0.5,
           size = 2) +
   geom_sf(data = Q10pts,
           aes(fill = Q10),
           shape = 25,
-          colour = "#404040",
+          colour = "#404040", alpha = 0.5,
           size = 2) +
   geom_sf(data = outline, fill = NA, colour = "black", linewidth = 0.2) +
   scale_fill_manual(values = mycols) +
@@ -219,12 +219,12 @@ SOcean <- ggplot() +
   geom_sf(data = pts,
           aes(fill = rate_name),
           shape = 21,
-          colour = "#404040",
+          colour = "#404040", alpha = 0.5,
           size = 2) +
   geom_sf(data = Q10pts,
           aes(fill = Q10),
           shape = 25,
-          colour = "#404040",
+          colour = "#404040", alpha = 0.5,
           size = 2) +
   geom_sf(data = outline, fill = NA, colour = "black", linewidth = 0.2) +
   scale_fill_manual(values = mycols) +
@@ -251,9 +251,9 @@ SOcean
        plot_layout(widths = c(.5, .5))) /
     (SOcean | plot_spacer() + 
        plot_layout(widths = c(.8, .1))))
-ggsave("Output/Figure_1.png", plot = Figure_1, width = 10, height = 12)
+
+ggsave("Output/Figure_1.png", plot = Figure_1, width = 12, height = 6)
 
 
 
 
-#** Using patchwork is like spreading frozen butter on fresh bread... leaving this as is for now*

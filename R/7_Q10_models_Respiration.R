@@ -89,8 +89,6 @@ mdat %>%
   geom_point(aes(x = x, y = y, colour = zoopGrp)) +
   theme_bw()
 
-# saveRDS(mdat, "Data/respiration_mdat.rds") # save modelling dataframe for plotting
-
 
 
 # Fit the bootstrap models using parallel processing ----
@@ -127,56 +125,12 @@ Q10_estimates <- boot_models |>
 # Tear down existing daemons
 mirai::daemons(0)
 
+Q10pdat
+
 # Save as RDS
 # saveRDS(Q10_estimates, "Data/Q10_estimates_respiration.rds") # estimates
+# saveRDS(mdat, "Data/respiration_mdat.rds") # save modelling dataframe for plotting
 # saveRDS(Q10pdat, "Data/Q10_summary_respiration.rds") # median and confidence intervals
-
-
-
-  
-# Plot it up ---- 
-
-# Dot plot of Q10
-Q10plot <- Q10pdat %>%
-  ggplot() +
-  geom_errorbar(aes(x = Group, ymin = lower_CI, ymax = upper_CI),
-                width = .1,
-                colour = "skyblue") +
-  geom_point(aes(x = Group, y = median),
-             size = 3,
-             colour = "darkblue") +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        axis.title.x = element_text(size = 14),
-        axis.title.y = element_text(size = 14),
-        axis.title.x.top = element_text(size = 14, face = "bold"),
-        axis.text = element_text(size = 12)) +  
-  labs(
-    x = expression(bold("Zooplankton group")),
-    y = expression(bold("Respiration rate Q"[10])))
-
-
-
-# Violin plot of log(Cspecific_rate)
-ratePlot <- mdat %>%
-  ggplot(aes(x = zoopGrp, y = log(Cspecific_rate))) +
-  geom_violin(fill = "skyblue", alpha = 0.5) +
-  geom_jitter(width = 0.2, alpha = 0.3, size = 1) + 
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        axis.title.x = element_text(size = 14),
-        axis.title.y = element_text(size = 14),
-        axis.title.x.top = element_text(size = 14, face = "bold"),
-        axis.text = element_text(size = 12)) +
-  labs(
-    x = expression(bold("Zooplankton group")),
-    y = expression(bold("log Respiration rate (mgC mgC"^-1*" h"^-1*")"))) 
-
-
-(figure2 <- Q10plot + ratePlot +
-  plot_layout(axis_titles = "collect_x"))
-
-# ggsave("Output/Figure_2_Respiration.png", plot = figure2, width = 12, height = 8)
 
 
 
@@ -190,7 +144,6 @@ groups <- levels(mdat$zoopGrp)
 # Extract results using get_results function
 results <- get_results(mdat, groups, coefs_list, Q10pdat)
 
-
 # Plot it up
 respiration_plot <- arrhenius_plot(
   mdat = mdat,
@@ -199,8 +152,8 @@ respiration_plot <- arrhenius_plot(
   Q10pdat = Q10pdat,
   group_order = group_order,
   x_limits = c(0.0037, 0.0033)) +
-  labs(y = expression(bold("Respiration rate (mgC mgC"^-1*" h"^-1*")")))
+  labs(y = expression(bold("Respiration rate (" * mu * "LO"[2] * " mgC"^-1 * " h"^-1 * ")")))
 
 respiration_plot
 
-# ggsave("Output/Figure_Supp4.png", plot = respiration_plot, width = 12, height = 4)
+# ggsave("Output/Figure_Supp4.png", plot = respiration_plot, width = 12, height = 8)
