@@ -158,24 +158,16 @@ p_composition <- ggplot(all_groups,
             hjust = -0.2, size = 3) +
   scale_fill_manual(values = mycols) +
   coord_flip() +
-  labs(x = "Zooplankton group",
-       y = "Number of species") +
+  labs(x = (expression(bold("Zooplankton group"))),
+       y = (expression(bold("Number of species")))) +
   theme_bw(base_size = 12) +
   theme(plot.title = element_text(face = "bold", size = 14),
         plot.subtitle = element_text(size = 11, colour = "grey30"),
-        legend.position = "bottom",
+        legend.position = "top",
+        legend.title = element_text(size = 14, face = "bold"),
         panel.grid.major.y = element_blank())
 
 p_composition
 
 # Save it
 # ggsave("Output/taxonomic_composition.png", p_composition, width = 10, height = 8, dpi = 300, bg = "white")
-
-
-
-# 
-
-
-
-
-

@@ -113,23 +113,10 @@ mainmap <- ggplot() +
         legend.title = element_text(size = 14, face = "bold"),
         plot.tag = element_text(size = 14, face = "bold")) +
   guides(fill = guide_legend(title = "Data type"),
-         color = guide_legend(title = "Data type")) +
-  labs(tag = "(a)")
-  
+         color = guide_legend(title = "Data type"))
 mainmap
 
-  
-  # Extract legend as a separate ggplot object
-  legend_plot <- as_ggplot(get_legend(
-    mainmap + 
-      guides(fill = guide_legend(
-        title = "Data type",
-        nrow = 5,  # Vertical legend
-        title.position = "top"
-      )) +
-      theme(legend.text = element_text(size = 11),
-            legend.title = element_text(size = 12, face = "bold"))
-  ))
+
 
 # Submap 1: Europe ----  
 Europe <- ggplot() +
@@ -152,9 +139,7 @@ Europe <- ggplot() +
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14),
         panel.grid = element_blank(),
-        plot.tag = element_text(size = 14, face = "bold")) +
-  labs(tag = "(b)")
-
+        plot.tag = element_text(size = 14, face = "bold"))
 Europe
 
 
@@ -179,9 +164,7 @@ NorthOceans <- ggplot() +
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14),
         panel.grid = element_blank(),        
-        plot.tag = element_text(size = 14, face = "bold")) +
-  labs(tag = "(c)")
-        
+        plot.tag = element_text(size = 14, face = "bold"))
 
 NorthOceans
 
@@ -207,9 +190,7 @@ NWPacific <- ggplot() +
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14),
         panel.grid = element_blank(),
-        plot.tag = element_text(size = 14, face = "bold")) +
-  labs(tag = "(d)")
-
+        plot.tag = element_text(size = 14, face = "bold"))
 NWPacific
 
 
@@ -236,9 +217,7 @@ SOcean <- ggplot() +
         panel.grid = element_blank(),
         plot.tag = element_text(size = 14, face = "bold")) +
   guides(fill = guide_legend(title = "Data type"),
-         color = guide_legend(title = "Data type")) +
-  labs(tag = "(e)")
-
+         color = guide_legend(title = "Data type"))
 SOcean
 
 
@@ -249,10 +228,10 @@ SOcean
        plot_layout(widths = c(.5, 1))) /
     (NorthOceans | NWPacific + 
        plot_layout(widths = c(.5, .5))) /
-    (SOcean | plot_spacer() + 
+    (SOcean + 
        plot_layout(widths = c(.8, .1))))
 
-ggsave("Output/Figure_1.png", plot = Figure_1, width = 12, height = 6)
+ggsave("Output/Figure_1.png", plot = Figure_1, height = 8)
 
 
 
