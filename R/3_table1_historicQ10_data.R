@@ -44,35 +44,31 @@ glimpse(dat)
 # Prepare dataframe for table
 tableDat <- dat %>%
   filter(rate %in% c(
-    "Ingestion", "Clearance", "Respiration",
-    "Growth", "HouseProduction", "ExcretionAmmonia", "ExcretionPhosphate"
-  )) %>%
+    "Clearance", "Ingestion", "Growth", "Respiration",
+     "HouseProduction", "ExcretionAmmonia", "ExcretionPhosphate")) %>%
   mutate(taxon_id = coalesce(taxa, genus, family, order, class, phylum)) %>%  # Get most specific taxon
   group_by(zoopGrp, rate) %>%
-  summarise(
-    Q10_summary = if (all(is.na(Q10))) {
-      NA_character_
-    } else {
+  summarise(Q10_summary = if (all(is.na(Q10))) {
+    NA_character_
+    } 
+    else {
       n_count <- sum(!is.na(Q10))
       n_taxa <- n_distinct(taxon_id[!is.na(Q10)])  # Count unique taxa with Q10 values
       paste0(
         round(mean(Q10, na.rm = TRUE), 2), # mean Q10
-        if (n_taxa == 1) "<sup>*</sup>" else "", # add asterisk if only 1 unique taxon
+        if (n_taxa == 1) "<sup>*</sup>" else "", # add * if only 1 unique taxon
         "<br>(", round(min(Q10, na.rm = TRUE), 2), "–", round(max(Q10, na.rm = TRUE), 2), # Q10 variance
         ", n = ", n_count, ")" # number of Q10s per rate
       ) 
     },
-    .groups = "drop"
-  ) %>%
-  pivot_wider(
-    names_from = rate,
-    values_from = Q10_summary
-  ) %>% 
-  select(zoopGrp, Ingestion, Clearance, Respiration, Growth, 
+    .groups = "drop") %>%
+  pivot_wider(names_from = rate,
+              values_from = Q10_summary) %>% 
+  select(zoopGrp, Clearance, Ingestion, Growth, Respiration, 
          HouseProduction, ExcretionAmmonia, ExcretionPhosphate) %>% 
-  arrange(factor(zoopGrp, levels = c("Copepoda", "Euphausiacea", "Amphipoda", 
+  arrange(factor(zoopGrp, levels = c("Amphipoda", "Euphausiacea", "Copepoda", 
                                      "Decapoda", "Mysida", "Chaetognatha", 
-                                     "Cnidaria", "Ctenophora", "Mollusca", 
+                                     "Ctenophora", "Cnidaria", "Mollusca", 
                                      "Thaliacea", "Appendicularia", "OTHER")))
 
 
@@ -83,10 +79,10 @@ table1 <- tableDat %>%
   cols_align(align = "center", columns = -zoopGrp) %>%
   cols_label(
     zoopGrp = "Zooplankton Group",
-    Ingestion = "Ingestion",
     Clearance = "Clearance",
-    Respiration = "Respiration",
+    Ingestion = "Ingestion",
     Growth = "Growth",
+    Respiration = "Respiration",
     HouseProduction = html("House<br>Production"),
     ExcretionAmmonia = html("Ammonia<br>Excretion"),
     ExcretionPhosphate = html("Phosphate<br>Excretion")
@@ -96,10 +92,10 @@ table1 <- tableDat %>%
     missing_text = "—"
   ) %>%
   tab_footnote(
-    footnote = "* Single species observation only (i.e., intraspecific Q10)",
+    footnote = "Values are mean interspecific Q10 with range in parentheses. *n* = number of Q10 values.",
   ) %>%
   tab_source_note(
-    source_note = md("Values are mean interspecific Q10 with range in parentheses. *n* = number of Q10 values.")
+    source_note = md("* Single species observation only (i.e., intraspecific Q10)")
   ) %>%
   tab_options(
     table.font.size = px(17),
@@ -132,71 +128,58 @@ table1 <- tableDat %>%
 table1
 
 # Save table ----
-gtsave(table1, "Output/Table_1.png", vwidth = 1200, vheight = 700)
+# gtsave(table1, "Output/Table_1.png", vwidth = 1200, vheight = 700)
 
   
 
+# Plot it up ---- 
+  # to visualise the distribution of historic temp dependence estimates
+# Custom grouping orders 
+group_order <- c("Amphipoda", "Euphausiacea", "Copepoda", "Decapoda", "Mysida", "Chaetognatha",  "Ctenophora", 
+                 "Cnidaria", "Mollusca", "Thaliacea", "Appendicularia")
+
+rate_order <- c("Clearance", "Ingestion", "Growth", "Respiration", 
+                "HouseProduction", "ExcretionAmmonia", "ExcretionPhosphate")
+
+# Create plotting dataframe
+pdat <- dat %>% 
+  filter(rate %in% c("Clearance", "Ingestion", "Growth", "Respiration", 
+                     "HouseProduction", "ExcretionAmmonia", "ExcretionPhosphate")) %>% 
+  select(rate, zoopGrp, Q10) %>% 
+  mutate(rate = fct_relevel(rate, rate_order),
+         rate = fct_recode(rate,
+                           "House Production"  = "HouseProduction",
+                           "Ammonia Excretion" = "ExcretionAmmonia",
+                           "Phosphate Excretion" = "ExcretionPhosphate"),
+    zoopGrp = fct_relevel(zoopGrp, group_order))
 
 
-  ####################### Below is working and dump code for now ########################
-  
-  # Create plotting dataframe
-  pdat <- dat %>% 
-    filter(rate %in% c("Ingestion", "Clearance", 
-                       "Respiration", 
-                       "Growth", "HouseProduction", 
-                       "ExcretionAmmonia", "ExcretionPhosphate")) 
-  # Box plot
-  ggplot(pdat, aes(x = zoopGrp, y = Q10, color = zoopGrp)) +
-    geom_point(position = position_jitter(width = 0.15), size = 1.5, alpha = 0.7) +
-    stat_summary(fun = median, geom = "crossbar", width = 0.5, color = "black") + 
-    facet_wrap(~rate, scales = "free_y") +
-    theme_bw() +
-    labs(
-      title = "Q10 Values by Zooplankton Group and Rate",
-      x = "Rate",
-      y = "Q10",
-      color = "Zooplankton Group"
-    ) +
-    theme(
-      axis.text.x = element_text(angle = 45, hjust = 1),
-      legend.position = "bottom"
-    )
-  
-  
-  # Prepare summary (mean Q10 per zoopGrp × rate)
-  summary_data <- pdat %>%
-    group_by(zoopGrp, rate) %>%
-    summarise(
-      mean_Q10 = mean(Q10, na.rm = TRUE),
-      .groups = "drop"
-    )
-  
-  ggplot() +
-    # Small dots: individual Q10s
-    geom_jitter(
-      data = pdat,
-      aes(x = zoopGrp, y = Q10, color = zoopGrp),
-      width = 0.15, size = 1.5, alpha = 0.6
-    ) +
-    # Large dots: mean Q10 (black)
-    geom_point(
-      data = summary_data,
-      aes(x = zoopGrp, y = mean_Q10),
-      color = "black",   # black large dots
-      size = 2
-    ) +
-    facet_wrap(~rate, scales = "fixed") +
-    theme_bw() +
-    labs(
-      title = "Mean Q10 with Individual Measurements by Zooplankton Group and Rate",
-      x = "Rate",
-      y = "Q10",
-      color = "Zooplankton Group"
-    ) +
-    theme(
-      axis.text.x = element_text(angle = 45, hjust = 1),
-      legend.position = "right"
-    )
+
+# Prepare summary (mean Q10 per zoopGrp by rate)
+summary_data <- pdat %>%
+  group_by(zoopGrp, rate) %>%
+  summarise(mean_Q10 = mean(Q10, na.rm = TRUE), .groups = "drop")
+
+meanQ10s<- ggplot() +
+  geom_jitter(data = pdat,
+              aes(x = zoopGrp, y = Q10),
+              color = "darkgrey",
+              width = 0.15, size = 1.5, alpha = 0.6) +
+  geom_point(data = summary_data,
+             aes(x = zoopGrp, y = mean_Q10),
+             color = "black", 
+             size = 2) +
+  facet_wrap(~rate, scales = "fixed", ncol = 2) +
+  theme_bw() +
+  labs(x = expression(bold("Zooplankton group")),
+       y = expression(bold("Temperature senstivitiy (Q"[10] *")"))) +
+  scale_y_continuous(breaks = seq(1, 8, by = 1)) +
+  theme(axis.text = element_text(size = 10),
+        legend.position = "right") +
+  coord_flip()
+meanQ10s
+
+# ggsave("Output/Figure_Supp2.png", plot = meanQ10s, width = 180, height = 220, units = "mm")
+
   
   

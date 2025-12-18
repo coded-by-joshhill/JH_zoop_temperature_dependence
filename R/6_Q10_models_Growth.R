@@ -158,5 +158,5 @@ growth_plot <- arrhenius_plot(
 
 growth_plot
 
-# ggsave("Output/Figure_Supp3.png", plot = growth_plot, width = 12, height = 12)
+# ggsave("Output/Figure_Supp5.png", plot = growth_plot, width = 12, height = 12)
 

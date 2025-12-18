@@ -160,4 +160,4 @@ clearance_plot <- arrhenius_plot(
 
 clearance_plot
 
-# ggsave("Output/Figure_Supp1.png", plot = clearance_plot, width = 12, height = 8)
+# ggsave("Output/Figure_Supp3.png", plot = clearance_plot, width = 12, height = 8)

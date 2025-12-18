@@ -10,7 +10,6 @@
 
 # Packages and helpers ----
 library(tidyverse)
-library(glmmTMB)
 library(gt)
 library(patchwork)
 source("R/0_Helpers.R")
@@ -50,7 +49,6 @@ coverage_table <- taxonomic_coverage %>%
   gt() %>%
   cols_label(
     Dataset = "Rate Process",
-    n_taxon = "Taxa",
     n_species = "Species",
     n_genera = "Genera",
     n_families = "Families",
@@ -90,7 +88,7 @@ coverage_table <- taxonomic_coverage %>%
 coverage_table
 
 # Save the table
-# gtsave(coverage_table, "Output/taxonomic_coverage_table.png", vwidth = 1000, vheight = 400)
+# gtsave(coverage_table, "Output/Table_S1.png", vwidth = 1000, vheight = 400)
 
 
 

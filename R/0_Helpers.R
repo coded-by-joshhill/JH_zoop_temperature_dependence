@@ -91,7 +91,6 @@ summarise_taxonomic_coverage <- function(data, dataset_name) {
   coverage <- data %>%
     summarise(
       Dataset    = dataset_name,
-      n_taxon    = n_distinct(taxa), 
       n_species  = n_distinct(species),
       n_genera   = n_distinct(genus),
       n_families = n_distinct(family, na.rm = TRUE),
@@ -315,7 +314,7 @@ plotQ10 <- function(Q10pdat, data_type, colours){
   p <- ggplot() +
     geom_errorbar(data = Q10pdat, aes(x = Group, ymin = lower_CI, ymax = upper_CI),
                   width = .2,
-                  alpha = 0.5,
+                  linewidth = 1,
                   colour = rateCol) +
     geom_point(data = Q10pdat, aes(x = Group, y = median),
                size = 3,
@@ -334,31 +333,4 @@ plotQ10 <- function(Q10pdat, data_type, colours){
 }
 # END OF Q10 PLOT FUNCTION
 
-
-# MASS-SPECIFIC RATE VIOLIN PLOT FUNCTION
-plotRates <- function(mdat, data_type, colours){
-  
-  # Get the rate-specific colour and unit
-  rateCol <- colours [[data_type]]
-
-  p <- mdat %>%
-    ggplot(aes(x = zoopGrp, y = log(Cspecific_rate))) +
-    geom_violin(fill = rateCol, 
-                alpha = 0.5) +
-    geom_jitter(width = 0.2, 
-                alpha = 0.3, 
-                size = 1) + 
-    theme_bw() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1),
-          axis.title.x = element_text(size = 14),
-          axis.title.y = element_text(size = 14),
-          axis.title.x.top = element_text(size = 14, face = "bold"),
-          axis.text = element_text(size = 12)) +
-    labs(
-      x = expression(bold("Zooplankton group"))) 
-  
-  return(p)
-  
-}
-# END OF RATE VIOLIN PLOT FUNCTION
 

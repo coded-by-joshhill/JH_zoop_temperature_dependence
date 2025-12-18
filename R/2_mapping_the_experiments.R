@@ -16,7 +16,6 @@ library(terra)
 library(sf)
 library(rnaturalearth)
 library(patchwork)
-library(cowplot)
 
 
 
@@ -102,9 +101,9 @@ mainmap <- ggplot() +
           size = 2) +
   geom_sf(data = Q10pts,
           aes(fill = Q10),
-          shape = 25,
+          shape = 21,
           colour = "#404040", alpha = 0.5,
-          size = 2) +
+          size = 1.5) +
   geom_sf(data = outline, fill = NA, colour = "black", linewidth = 0.2) +
   scale_fill_manual(values = mycols) +
   theme_void() +
@@ -115,6 +114,7 @@ mainmap <- ggplot() +
   guides(fill = guide_legend(title = "Data type"),
          color = guide_legend(title = "Data type"))
 mainmap
+ggsave("Output/Figure_1.1.png", plot = mainmap, height = 10)
 
 
 
@@ -128,12 +128,12 @@ Europe <- ggplot() +
           size = 2) +
   geom_sf(data = Q10pts,
           aes(fill = Q10),
-          shape = 25,
+          shape = 21,
           colour = "#404040", alpha = 0.5,
-          size = 2) +
+          size = 1.5) +
   geom_sf(data = outline, fill = NA, colour = "black", linewidth = 0.2) +
   scale_fill_manual(values = mycols) +
-  coord_sf(xlim = c(-20, 40), ylim = c(35, 80), crs = 4326) +  # Europe bounds
+  coord_sf(xlim = c(-10, 30), ylim = c(34, 63), crs = 4326) +  # Europe bounds
   theme_bw() +
   theme(legend.position = "none",
         legend.text = element_text(size = 12),
@@ -141,6 +141,7 @@ Europe <- ggplot() +
         panel.grid = element_blank(),
         plot.tag = element_text(size = 14, face = "bold"))
 Europe
+ggsave("Output/Figure_1.2.png", plot = Europe, height = 8)
 
 
 # Submap 2: Northern Oceans
@@ -153,12 +154,12 @@ NorthOceans <- ggplot() +
           size = 2) +
   geom_sf(data = Q10pts,
           aes(fill = Q10),
-          shape = 25,
+          shape = 21,
           colour = "#404040", alpha = 0.5,
-          size = 2) +
+          size = 1.5) +
   geom_sf(data = outline, fill = NA, colour = "black", linewidth = 0.2) +
   scale_fill_manual(values = mycols) +
-  coord_sf(xlim = c(-160, -50), ylim = c(20, 70), crs = 4326) +  # Europe bounds
+  coord_sf(xlim = c(-130, -50), ylim = c(20, 70), crs = 4326) +  # Europe bounds
   theme_bw() +
   theme(legend.position = "none",
         legend.text = element_text(size = 12),
@@ -167,6 +168,7 @@ NorthOceans <- ggplot() +
         plot.tag = element_text(size = 14, face = "bold"))
 
 NorthOceans
+ggsave("Output/Figure_1.3.png", plot = NorthOceans, height = 8)
 
 
 # Submap 3: NWPacific
@@ -179,12 +181,12 @@ NWPacific <- ggplot() +
           size = 2) +
   geom_sf(data = Q10pts,
           aes(fill = Q10),
-          shape = 25,
+          shape = 21,
           colour = "#404040", alpha = 0.5,
-          size = 2) +
+          size = 1.5) +
   geom_sf(data = outline, fill = NA, colour = "black", linewidth = 0.2) +
   scale_fill_manual(values = mycols) +
-  coord_sf(xlim = c(100, 160), ylim = c(20, 50), crs = 4326) +  # Europe bounds
+  coord_sf(xlim = c(110, 155), ylim = c(20, 46), crs = 4326) +  # Europe bounds
   theme_bw() +
   theme(legend.position = "none",
         legend.text = element_text(size = 12),
@@ -192,6 +194,7 @@ NWPacific <- ggplot() +
         panel.grid = element_blank(),
         plot.tag = element_text(size = 14, face = "bold"))
 NWPacific
+ggsave("Output/Figure_1.4.png", plot = NWPacific, height = 6)
 
 
 # Submap 4: Southern Ocean
@@ -204,14 +207,14 @@ SOcean <- ggplot() +
           size = 2) +
   geom_sf(data = Q10pts,
           aes(fill = Q10),
-          shape = 25,
+          shape = 21,
           colour = "#404040", alpha = 0.5,
-          size = 2) +
+          size = 1.5) +
   geom_sf(data = outline, fill = NA, colour = "black", linewidth = 0.2) +
   scale_fill_manual(values = mycols) +
   coord_sf(xlim = c(-90, 160), ylim = c(-80, -30), crs = 4326) +
   theme_bw() +
-  theme(legend.position = "right",
+  theme(legend.position = "none",
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14, face = "bold"),
         panel.grid = element_blank(),
@@ -219,6 +222,7 @@ SOcean <- ggplot() +
   guides(fill = guide_legend(title = "Data type"),
          color = guide_legend(title = "Data type"))
 SOcean
+ggsave("Output/Figure_1.5.png", plot = SOcean, width = 8)
 
 
 
@@ -231,7 +235,7 @@ SOcean
     (SOcean + 
        plot_layout(widths = c(.8, .1))))
 
-ggsave("Output/Figure_1.png", plot = Figure_1, height = 8)
+# ggsave("Output/Figure_1.png", plot = Figure_1, height = 8)
 
 
 

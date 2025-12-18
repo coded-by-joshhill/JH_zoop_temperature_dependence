@@ -128,9 +128,9 @@ mirai::daemons(0)
 Q10pdat
 
 # Save as RDS
-saveRDS(Q10_estimates, "Data/Q10_estimates_ingestion.rds") # estimates
-saveRDS(mdat, "Data/ingestion_mdat.rds") # save modelling dataframe for plotting
-saveRDS(Q10pdat, "Data/Q10_summary_ingestion.rds") # median and confidence intervals
+# saveRDS(Q10_estimates, "Data/Q10_estimates_ingestion.rds") # estimates
+# saveRDS(mdat, "Data/ingestion_mdat.rds") # save modelling dataframe for plotting
+# saveRDS(Q10pdat, "Data/Q10_summary_ingestion.rds") # median and confidence intervals
 
 
 
@@ -156,4 +156,4 @@ ingestion_plot <- arrhenius_plot(
 
 ingestion_plot
 
-# ggsave("Output/Figure_Supp2.png", plot = ingestion_plot, width = 12, height = 4.5)
+# ggsave("Output/Figure_Supp4.png", plot = ingestion_plot, width = 12, height = 4.5)

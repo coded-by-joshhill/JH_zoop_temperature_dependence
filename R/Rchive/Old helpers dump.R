@@ -90,3 +90,32 @@ analyse_thermal_sensitivity <- function(model, data,
   ))
 }
 # END OF THERMAL SENSITIVITY ANALYSER
+
+
+
+# MASS-SPECIFIC RATE VIOLIN PLOT FUNCTION
+plotRates <- function(mdat, data_type, colours){
+  
+  # Get the rate-specific colour and unit
+  rateCol <- colours [[data_type]]
+  
+  p <- mdat %>%
+    ggplot(aes(x = zoopGrp, y = log(Cspecific_rate))) +
+    geom_violin(fill = rateCol, 
+                alpha = 0.5) +
+    geom_jitter(width = 0.2, 
+                alpha = 0.3, 
+                size = 1) + 
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          axis.title.x = element_text(size = 14),
+          axis.title.y = element_text(size = 14),
+          axis.title.x.top = element_text(size = 14, face = "bold"),
+          axis.text = element_text(size = 12)) +
+    labs(
+      x = expression(bold("Zooplankton group"))) 
+  
+  return(p)
+  
+}
+# END OF RATE VIOLIN PLOT FUNCTION

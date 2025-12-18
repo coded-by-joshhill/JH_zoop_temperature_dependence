@@ -156,4 +156,4 @@ respiration_plot <- arrhenius_plot(
 
 respiration_plot
 
-# ggsave("Output/Figure_Supp4.png", plot = respiration_plot, width = 12, height = 8)
+# ggsave("Output/Figure_Supp6.png", plot = respiration_plot, width = 12, height = 8)
