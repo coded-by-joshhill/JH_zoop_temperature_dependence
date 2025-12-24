@@ -11,8 +11,6 @@
 
 # Packages and helpers ----
 library(tidyverse)
-library(ggh4x)
-library(terra)
 library(sf)
 library(rnaturalearth)
 library(patchwork)
@@ -20,10 +18,46 @@ library(patchwork)
 
 
 # Read in the data ----
-feedDat <- readRDS("Data/clear_ingest_data.rds")
-growDat <- readRDS("Data/grwth_dat.rds")
-respDat <- readRDS("Data/resp_dat.rds")
-Q10Dat <- readRDS("Data/historicQ10_dat.rds")
+feedDat <- readRDS("Data/clear_ingest_data.rds") %>% 
+    group_by(zoopGrp) %>% 
+    filter(n() >= 20, # Exclude zoopGrps that don't have suitable data or temp ranges
+           max(temp_C) - min(temp_C) >= 5) %>% 
+    ungroup() %>% 
+    drop_na(Cspecific_rate)
+
+
+growDat <- readRDS("Data/grwth_dat.rds") %>% 
+  group_by(zoopGrp) %>% 
+  filter(n() >= 20,
+         max(temp_C) - min(temp_C) >= 5) %>% 
+  ungroup() %>% 
+  drop_na(Cspecific_rate)
+
+
+respDat <- readRDS("Data/resp_dat.rds") %>% 
+  group_by(zoopGrp) %>% 
+  filter(n() >= 20,
+         max(temp_C) - min(temp_C) >= 5) %>% 
+  ungroup() %>% 
+  drop_na(Cspecific_rate)
+  
+
+Q10Dat <- readRDS("Data/historicQ10_dat.rds") %>% 
+  filter(!phylum == "Rotifera") %>% 
+  mutate(zoopGrp = case_when( # Create custom groupings following Ikeda2014
+    order == "Euphausiacea"   ~ "Euphausiacea",
+    order == "Amphipoda"      ~ "Amphipoda",
+    order == "Decapoda"       ~ "Decapoda",
+    order == "Mysidacea"      ~ "Mysida",
+    class == "Copepoda"       ~ "Copepoda",
+    phylum == "Mollusca"      ~ "Mollusca",
+    phylum == "Chaetognatha"  ~ "Chaetognatha",
+    phylum == "Cnidaria"      ~ "Cnidaria",
+    phylum == "Ctenophora"    ~ "Ctenophora",
+    class == "Thaliacea"      ~ "Thaliacea",
+    class == "Appendicularia" ~ "Appendicularia",
+    .default = "OTHER")) %>% 
+  relocate(zoopGrp, .before = phylum)
   
 
   # Assign rate dataframes to an object
@@ -114,7 +148,7 @@ mainmap <- ggplot() +
   guides(fill = guide_legend(title = "Data type"),
          color = guide_legend(title = "Data type"))
 mainmap
-ggsave("Output/Figure_1.1.png", plot = mainmap, height = 10)
+# ggsave("Output/Figure_1.1.png", plot = mainmap, height = 10)
 
 
 
@@ -141,7 +175,8 @@ Europe <- ggplot() +
         panel.grid = element_blank(),
         plot.tag = element_text(size = 14, face = "bold"))
 Europe
-ggsave("Output/Figure_1.2.png", plot = Europe, height = 8)
+# ggsave("Output/Figure_1.2.png", plot = Europe, height = 8)
+
 
 
 # Submap 2: Northern Oceans
@@ -168,7 +203,7 @@ NorthOceans <- ggplot() +
         plot.tag = element_text(size = 14, face = "bold"))
 
 NorthOceans
-ggsave("Output/Figure_1.3.png", plot = NorthOceans, height = 8)
+# ggsave("Output/Figure_1.3.png", plot = NorthOceans, height = 8)
 
 
 # Submap 3: NWPacific
@@ -194,7 +229,7 @@ NWPacific <- ggplot() +
         panel.grid = element_blank(),
         plot.tag = element_text(size = 14, face = "bold"))
 NWPacific
-ggsave("Output/Figure_1.4.png", plot = NWPacific, height = 6)
+# ggsave("Output/Figure_1.4.png", plot = NWPacific, height = 6)
 
 
 # Submap 4: Southern Ocean
@@ -222,7 +257,7 @@ SOcean <- ggplot() +
   guides(fill = guide_legend(title = "Data type"),
          color = guide_legend(title = "Data type"))
 SOcean
-ggsave("Output/Figure_1.5.png", plot = SOcean, width = 8)
+# ggsave("Output/Figure_1.5.png", plot = SOcean, width = 8)
 
 
 
@@ -236,6 +271,33 @@ ggsave("Output/Figure_1.5.png", plot = SOcean, width = 8)
        plot_layout(widths = c(.8, .1))))
 
 # ggsave("Output/Figure_1.png", plot = Figure_1, height = 8)
+
+
+
+# Regional representation of mapped data ----
+region_props <- bind_rows(
+  mdat %>%
+    drop_na(lat, lon) %>%
+    mutate(type = rate_name),
+  Q10Dat %>%
+    drop_na(lat, lon) %>%
+    mutate(type = "Q10")) %>%
+  mutate(
+    region = case_when(
+      lon >= -10  & lon <= 30  & lat >= 34  & lat <= 63  ~ "Europe",
+      lon >= -100 & lon <= -60 & lat >= 20  & lat <= 70  ~ "NW Atlantic",
+      lon >= 110  & lon <= 155 & lat >= 20  & lat <= 46  ~ "NW Pacific",
+      lon >= -160  & lon <= -100 & lat >= 20  & lat <= 60  ~ "NE Pacific",
+      lon >= -90  & lon <= 160 & lat >= -80 & lat <= -50 ~ "Southern Ocean",
+      lon >= 110  & lon <= 180 & lat >= -50 & lat <= 0 ~ "Australia & Oceania",
+      TRUE ~ "Other")) %>%
+  count(type, region) %>%
+  group_by(type) %>%
+  mutate(prop = n / sum(n)) %>%
+  ungroup() %>%
+  arrange(type, desc(prop) )
+
+region_props %>% print(n = "Inf")
 
 
 

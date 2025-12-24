@@ -18,13 +18,37 @@ source("R/0_Helpers.R")
 
 # Read in the data ----
 clearance <- readRDS("Data/clear_ingest_data.rds") %>% 
-  filter(rate_name == "ClearanceRate",
-         !taxa == "Unknown")
+  filter(rate_name == "ClearanceRate") %>% 
+  group_by(zoopGrp) %>% 
+  filter(n() >= 20,
+         max(temp_C) - min(temp_C) >= 5) %>% 
+  ungroup() %>% 
+  drop_na(Cspecific_rate)
+
+
 ingestion <- readRDS("Data/clear_ingest_data.rds") %>% 
-  filter(rate_name == "IngestionRate",
-         !taxa == "Unknown")
-growth <- readRDS("Data/grwth_dat.rds")
-respiration <- readRDS("Data/resp_dat.rds")
+  filter(rate_name == "IngestionRate") %>% 
+  group_by(zoopGrp) %>% 
+  filter(n() >= 20,
+         max(temp_C) - min(temp_C) >= 5) %>% 
+  ungroup() %>% 
+  drop_na(Cspecific_rate)
+
+
+growth <- readRDS("Data/grwth_dat.rds") %>% 
+  group_by(zoopGrp) %>% 
+  filter(n() >= 20,
+         max(temp_C) - min(temp_C) >= 5) %>% 
+  ungroup() %>% 
+  drop_na(Cspecific_rate)
+
+
+respiration <- readRDS("Data/resp_dat.rds") %>% 
+  group_by(zoopGrp) %>% 
+  filter(n() >= 20,
+         max(temp_C) - min(temp_C) >= 5) %>% 
+  ungroup() %>% 
+  drop_na(Cspecific_rate)
 
 
 
@@ -153,19 +177,18 @@ p_composition <- ggplot(all_groups,
   geom_col(position = "dodge", width = 0.7) +
   geom_text(aes(label = n_species), 
             position = position_dodge(width = 0.7), 
-            hjust = -0.2, size = 3) +
+            hjust = -0.5, size = 3.5) +
   scale_fill_manual(values = mycols) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
   coord_flip() +
   labs(x = (expression(bold("Zooplankton group"))),
        y = (expression(bold("Number of species")))) +
   theme_bw(base_size = 12) +
-  theme(plot.title = element_text(face = "bold", size = 14),
-        plot.subtitle = element_text(size = 11, colour = "grey30"),
-        legend.position = "top",
+  theme(legend.position = "top",
         legend.title = element_text(size = 14, face = "bold"),
         panel.grid.major.y = element_blank())
 
 p_composition
 
 # Save it
-# ggsave("Output/taxonomic_composition.png", p_composition, width = 10, height = 8, dpi = 300, bg = "white")
+# ggsave("Output/Figure_Supp1.png", p_composition, width = 10, height = 8, dpi = 300, bg = "white")
