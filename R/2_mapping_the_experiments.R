@@ -261,7 +261,7 @@ SOcean
 
 
 
-# Combine plots ----
+# Combine plots for visual ----
 (Figure_1 <-
     (mainmap | Europe +
        plot_layout(widths = c(.5, 1))) /
@@ -270,35 +270,34 @@ SOcean
     (SOcean + 
        plot_layout(widths = c(.8, .1))))
 
-# ggsave("Output/Figure_1.png", plot = Figure_1, height = 8)
-
+  # This looks OK but for now I'll do the illustration in Inkscape...
 
 
 # Regional representation of mapped data ----
+# Take my two datasets and assess the proportion of each rate for each region
 region_props <- bind_rows(
-  mdat %>%
+  mdat %>% 
     drop_na(lat, lon) %>%
     mutate(type = rate_name),
   Q10Dat %>%
     drop_na(lat, lon) %>%
-    mutate(type = "Q10")) %>%
+    mutate(type = "Q10")
+) %>%
   mutate(
     region = case_when(
-      lon >= -10  & lon <= 30  & lat >= 34  & lat <= 63  ~ "Europe",
-      lon >= -100 & lon <= -60 & lat >= 20  & lat <= 70  ~ "NW Atlantic",
-      lon >= 110  & lon <= 155 & lat >= 20  & lat <= 46  ~ "NW Pacific",
-      lon >= -160  & lon <= -100 & lat >= 20  & lat <= 60  ~ "NE Pacific",
-      lon >= -90  & lon <= 160 & lat >= -80 & lat <= -50 ~ "Southern Ocean",
-      lon >= 110  & lon <= 180 & lat >= -50 & lat <= 0 ~ "Australia & Oceania",
-      TRUE ~ "Other")) %>%
+      lon >= -10 & lon <= 30 & lat >= 34 & lat <= 63 ~ "Europe",
+      lon >= -100 & lon <= -60 & lat >= 20 & lat <= 70 ~ "NW Atlantic",
+      lon >= 110 & lon <= 155 & lat >= 20 & lat <= 46 ~ "NW Pacific",
+      lon >= -160 & lon <= -100 & lat >= 20 & lat <= 60 ~ "NE Pacific",
+      lon >= -90 & lon <= 160 & lat >= -80 & lat <= -50 ~ "Southern Ocean",
+      lon >= 110 & lon <= 180 & lat >= -50 & lat <= 0 ~ "Australia & Oceania",
+      TRUE ~ "Other"
+    )
+  ) %>%
   count(type, region) %>%
   group_by(type) %>%
   mutate(prop = n / sum(n)) %>%
   ungroup() %>%
-  arrange(type, desc(prop) )
+  arrange(type, desc(prop))
 
 region_props %>% print(n = "Inf")
-
-
-
-

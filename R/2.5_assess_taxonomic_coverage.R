@@ -16,7 +16,7 @@ source("R/0_Helpers.R")
 
 
 
-# Read in the data ----
+# Read in and filter the cleaned data ----
 clearance <- readRDS("Data/clear_ingest_data.rds") %>% 
   filter(rate_name == "ClearanceRate") %>% 
   group_by(zoopGrp) %>% 
@@ -53,10 +53,8 @@ respiration <- readRDS("Data/resp_dat.rds") %>%
 
 
 # Taxonomic coverage summary ----
-  # Simple assessment of the taxonomic coverage of each dataset
-
 # Calculate coverage for each dataset using custom function
-  # The function takes the dataset and assigns a dataset name and calculates simple summaries
+  # The function takes the dataset and assigns a it name, then generates simple summaries
 clearance_coverage <- summarise_taxonomic_coverage(clearance, "Clearance")
 ingestion_coverage <- summarise_taxonomic_coverage(ingestion, "Ingestion")
 growth_coverage <- summarise_taxonomic_coverage(growth, "Growth")
@@ -65,10 +63,11 @@ respiration_coverage <- summarise_taxonomic_coverage(respiration, "Respiration")
 
 # Combine outputs into a summary table
 taxonomic_coverage <- bind_rows(clearance_coverage, ingestion_coverage, growth_coverage, respiration_coverage)
-
 taxonomic_coverage
 
-# Create a table for supplementary materials
+
+
+# Create a table for supplementary materials ----
 coverage_table <- taxonomic_coverage %>%
   gt() %>%
   cols_label(
@@ -80,9 +79,6 @@ coverage_table <- taxonomic_coverage %>%
     n_classes = "Classes",
     n_phyla = "Phyla",
     n_observations = "Observations") %>%
-  tab_header(
-    title = "Taxonomic coverage across rate processes",
-    subtitle = "Number of unique taxonomic units represented in each dataset") %>%
   cols_align(align = "center", columns = -Dataset) %>%
   tab_options(
     table.font.size = px(17),
@@ -112,13 +108,12 @@ coverage_table <- taxonomic_coverage %>%
 coverage_table
 
 # Save the table
-# gtsave(coverage_table, "Output/Table_S1.png", vwidth = 1000, vheight = 400)
+# gtsave(coverage_table, "Output/Table_S1.png", vwidth = 650, vheight = 500)
 
 
 
 # Taxonomic composition by zoopGrp ----
 # Show the distribution of species across major taxonomic groups relative to each rate process
-
 
 # Calculate for each dataset
 clearance_by_group <- clearance %>%
@@ -183,7 +178,7 @@ p_composition <- ggplot(all_groups,
   coord_flip() +
   labs(x = (expression(bold("Zooplankton group"))),
        y = (expression(bold("Number of species")))) +
-  theme_bw(base_size = 12) +
+  theme_bw(base_size = 14) +
   theme(legend.position = "top",
         legend.title = element_text(size = 14, face = "bold"),
         panel.grid.major.y = element_blank())
@@ -191,4 +186,4 @@ p_composition <- ggplot(all_groups,
 p_composition
 
 # Save it
-# ggsave("Output/Figure_Supp1.png", p_composition, width = 10, height = 8, dpi = 300, bg = "white")
+ggsave("Output/Figure_Supp1.png", p_composition, width = 10, height = 8, dpi = 300, bg = "white")

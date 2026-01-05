@@ -10,7 +10,8 @@ library(glmmTMB)
 
 
 
-############# Functions ############# 
+############# FUNCTIONS FOR DATA CLEANING AND ANALYSIS ############# 
+
 
 # Carbon weight converter ----
 # Convert carbon weights to mg
@@ -105,9 +106,8 @@ summarise_taxonomic_coverage <- function(data, dataset_name) {
 
 
 
-# THERMAL SENSITIVITY FUNCTIONS ----
-# Two functions that are used to estimate thermal sensitivities per group
-
+# BOOTSTRAP MODEL FUNCTION ----
+# Using glmmTMB...
 # Calculate Q10 with CI and prediction ribbons for plotting using bootstrapping for confidence intervals
 boot_Q10 <- function(df) {
   require(glmmTMB, quietly = TRUE)
@@ -116,7 +116,11 @@ boot_Q10 <- function(df) {
   d <- df[df_id,] # Get those random rows
   out <- glmmTMB(y ~ x * zoopGrp + (1|primRef) + (1|taxa),  data = d) # fit the model
 }
+# END OF BOOTSTRAP MODEL FUNCTION
 
+
+
+# GET Q10 FUNCTION ----
 # Get Q10s from bootstrap models
 get_Q10s <- function(m) {
   require(dplyr, quietly = TRUE)
@@ -150,7 +154,7 @@ get_Q10s <- function(m) {
   }
   map_dfr(data, Q10_by_group)
 }
-# END OF THERMAL SENSITIVITY ANALYSERS
+# END OF GETQ10 FUNCTION
 
 
 
@@ -215,12 +219,14 @@ get_results <- function(df, groups, coefs_list, Q10pdat) {
   names(results) <- groups
   return(results)
 }
-# END OF EXTRACTING RESULTS Fn
+# END OF EXTRACTING RESULTS FUNCTION
 
 
-######################### PLOTTING FUNCTIONS #########################
 
-# ARRHENIUS PLOT FUNCTION
+######################### FUNCTIONS FOR PLOTTING #########################
+
+
+# ARRHENIUS PLOT FUNCTION ----
 arrhenius_plot <- function(mdat, rate_col, boot_models, Q10pdat, 
                            group_order = NULL, x_limits = NULL, ncol = 3) {
   
@@ -305,7 +311,7 @@ arrhenius_plot <- function(mdat, rate_col, boot_models, Q10pdat,
 
 
 
-# Q10 PLOT FUNCTION
+# Q10 PLOT FUNCTION ----
 plotQ10 <- function(Q10pdat, data_type, colours){
   
   # Get the rate-specific colour

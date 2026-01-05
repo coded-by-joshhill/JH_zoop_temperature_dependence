@@ -11,7 +11,7 @@ The rate process data for this project consists of respiration, ingestion and cl
 Here we save data files such as RDS and/or small csv files. Other data used in the analysis are provided via web links.
 
 | Files | Description |
-|------------------|------------------------------------------------------|
+|-------------------|-----------------------------------------------------|
 | xyz_data.rds | These data files are cleaned rate process and Q10 data. |
 | Q10_estimates_xyz.rds | These files are Q10 estimate output generated using bootstrap models. |
 | Q10_summary_xyz.rds | These files are Q10 summaries which include Q10 estimates and confidence intervals which are estimated using the bootstrap models output. |
@@ -45,7 +45,7 @@ This folder contains all .R scripts that are used to perform data cleaning and a
 
 -   **1.5_assess_taxonomic_coverage:** This script is a work in progress... but is planned to read all datasets in, subset by taxa and perform a taxonomic coverage assessment to resolve zooplankton species bias across rates and zooplankton groups.
 
--   **2_mapping_the_experiments:** First, this script loads all rate process datasets and historic Q~10~ data. Reads in shapefiles using the *rnaturalearth* package. Converts compiled data lat/lon's to sf for plotting. Finally, generates a series of maps to illustrate the distribution of rate processes and historic temperature dependence data across the Earth.
+-   **2_mapping_the_experiments:** First, this script loads all rate process datasets and historic Q~10~ data. Reads in shapefiles using the *rnaturalearth* package. Converts compiled data lat/lon's to sf for plotting. Finally, generates a series of maps to illustrate the distribution of rate processes and historic temperature dependence data across Earth.
 
 -   **3_table1_historicQ10_data**: This script summarises the compiled historic Q~10~ values for zooplankton and reports them in a table using the *gt* package.
 
@@ -61,13 +61,15 @@ This folder contains all .R scripts that are used to perform data cleaning and a
 
     -   Fifth, we estimate the 95% confidence intervals for Q~10~ estimates using coefficients from the boostrap models output.
 
-    -   Finally, we plot the results in a dot plot and violin plot to illustrate median Q~10~ (95% confidence intervals) and the variance of mass-specific clearance rate for each zooplankton group. We then generate inverse Arrhenius plots to illustrate the relationship between temperature and carbon mass-specific clearance rates for each zooplankton group available.
+    -   Finally, we save the data for a final visualisation and then generate inverse Arrhenius plots to illustrate the relationship between temperature and carbon mass-specific clearance rates for each zooplankton group available.
 
 -   **5_Q10_models_Ingestion:** This script follows the same workflow as script 4, but for ingestion rate.
 
 -   **6_Q10_models_Growth:** This script follows the same workflow as script 4, but for growth rate.
 
 -   **7_Q10_models_Respiration:** This script follows the same workflow as script 4, but for respiration.
+
+-   **8_figure2_Q10_plots.R:** This script combines all Q10 data for each rate and generates dot plots to illustrate median Q~10~ (95% confidence intervals) for each zooplankton group with available data.
 
 ## Output
 
