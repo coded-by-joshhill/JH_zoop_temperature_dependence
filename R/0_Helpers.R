@@ -13,15 +13,31 @@ library(glmmTMB)
 ############# FUNCTIONS FOR DATA CLEANING AND ANALYSIS ############# 
 
 
-# Carbon weight converter ----
+
+# BODY MASS AS CARBON CALCULATOR
+# Estimate carbon weight using an allometric equation
+calc_BMC <- function(bodyLength_mm) {
+  
+  # Following Jaspers et al. 2009, use the slope (2.455), intercept (-6.96), and trunk length (TL) to estimate carbon mass
+  # where, logC (ugC) = 2.455 log TL(um) -6.96.... located in Table 1 and Figure 2 - DOI: 10.1093/plankt/fbp002 
+  # therefore... C (ugC) = 10^-6.96 * (bodyLength (mm) * 1000) ^ 2.455
+  carbonMass_ugC = 10^(-6.96) * (bodyLength_mm * 1000) ^ 2.455
+  
+  return(carbonMass_ugC)
+}
+# END OF BMC CALCULATOR
+
+
+
+# CARBON WEIGHT CONVERTER ----
 # Convert carbon weights to mg
 convert_CW <- function(weight, unit) {
   if(is.na(weight) || is.na(unit)) return(NA_real_)
-  if(unit == "mg") return(weight)              # maintain mg
-  if(unit == "ug") return(weight / 1000)       # µg to mg
-  if(unit == "ng") return(weight / 1e6)        # ng to mg
-  if(unit == "g")  return(weight * 1000)       # g to mg
-  if(unit == "kg") return(weight * 1e6)        # kg to mg
+  if(unit == "mg") return(weight)         # maintain mg
+  if(unit == "ug") return(weight / 1000)  # µg to mg
+  if(unit == "ng") return(weight / 1e6)   # ng to mg
+  if(unit == "g")  return(weight * 1000)  # g to mg
+  if(unit == "kg") return(weight * 1e6)   # kg to mg
   
   return(NA_real_)
 }

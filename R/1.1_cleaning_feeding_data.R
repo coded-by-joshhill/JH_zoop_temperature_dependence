@@ -21,12 +21,35 @@ source("R/0_Helpers.R")
 
 
 # Read in the data ----
-dat <- read_csv("https://www.dropbox.com/scl/fi/b1pl3iys1kqtuiwbfd99h/IngClear_dat.csv?rlkey=4ce0im2s1latych74hos8uors&st=8c3k443n&dl=1", 
+dat <- read_csv("https://www.dropbox.com/scl/fi/b1pl3iys1kqtuiwbfd99h/IngClear_dat.csv?rlkey=4ce0im2s1latych74hos8uors&st=7pwjkk5p&dl=1", 
                 skip = 1) %>%
   mutate(ref_no = paste0("Hill_", row_number()),
          taxa = str_squish(taxa)) %>% # create a unique identifier (e.g., Hill_row#)
   relocate(ref_no, .before = everything()) # move it before all columns
 glimpse(dat)
+
+
+
+# Estimate carbon body mass on the basis of body length ----
+cMassDat <- dat %>% 
+  select(ref_no, primRef, body_length_mm, BM_C, weight_unit) %>% 
+  # Filter for records that need carbon mass estimated - larvaceans here
+  filter(primRef %in% c("Lombard2009", "Broms2003", "Aguirre2006", "DadonPilosof2023")) %>% 
+  arrange(ref_no) %>% 
+  mutate(BM_C = calc_BMC(body_length_mm),
+         weight_unit = "ug") %>% 
+  select(-body_length_mm) 
+
+
+  # Update dat
+  dat <- dat %>%
+    left_join(cMassDat, 
+              by = c("ref_no", "primRef"), 
+              suffix = c("", "_new")) %>%
+    mutate(BM_C = coalesce(BM_C_new, BM_C), 
+           weight_unit = coalesce(weight_unit_new, weight_unit)) %>%
+    select(-ends_with("_new")) %>%
+    arrange(as.numeric(str_extract(ref_no, "\\d+")))
 
 
   # Look at all unique ClearanceRate taxon
@@ -139,8 +162,7 @@ datClean <- dat %>%
     select(zoopGrp, temp_C, rate_name) %>% 
     group_by(zoopGrp) %>% 
     filter(rate_name == "ClearanceRate") %>% 
-    summarise( 
-      temp_range = paste0(min(temp_C), "-", max(temp_C)))
+    summarise(temp_range = paste0(min(temp_C), "-", max(temp_C)))
       # All have sensible ranges for estimating Q10, except for Chaetognaths
   
   
@@ -192,7 +214,7 @@ datFinal <- datClean %>%
     rate_unit_fin  = .conv$unit) %>%
   ungroup() %>%
       
-      
+  
   # Convert to mass-specific rates
   mutate(Cspecific_rate = case_when(
     rate_name == "ClearanceRate" & rate_unit_fin == "ml/mgC/hr"                   ~ rate_value_fin,
@@ -203,7 +225,8 @@ datFinal <- datClean %>%
     final_unit = case_when(
       rate_name == "ClearanceRate" & !is.na(Cspecific_rate) ~ "ml/mgC/hr",
       rate_name == "IngestionRate" & !is.na(Cspecific_rate) ~ "mgC/mgC/hr",
-      TRUE ~ rate_unit_fin)) %>%
+      TRUE ~ rate_unit_fin),
+    zoopGrp = as.factor(zoopGrp)) %>%
   select(-.conv, -rate_value_fin, -rate_unit_fin) %>% 
   relocate(Cspecific_rate, .after = rate_name) %>% 
   relocate(final_unit, .after = Cspecific_rate)

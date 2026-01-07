@@ -21,7 +21,7 @@ source("R/0_Helpers.R")
 
 
 # Read in the data ----
-dat <- read_csv("https://www.dropbox.com/scl/fi/gdllcg9d1dx1dzf38pckd/Grwth_dat.csv?rlkey=xqayol7mkakxn2fdek5yvkkn8&st=ju2ms1t2&dl=1",
+dat <- read_csv("https://www.dropbox.com/scl/fi/gdllcg9d1dx1dzf38pckd/Grwth_dat.csv?rlkey=xqayol7mkakxn2fdek5yvkkn8&st=2vtdemur&dl=1",
                 skip = 1) %>%
   mutate(ref_no = if_else(is.na(ref_no) | ref_no == "", # if the value is NA or empty...
                           paste0("Hill_", row_number()), # apply a unique reference number
@@ -29,6 +29,29 @@ dat <- read_csv("https://www.dropbox.com/scl/fi/gdllcg9d1dx1dzf38pckd/Grwth_dat.
          taxa = str_squish(taxa)) %>% # remove extra spaces from taxon names
   relocate(ref_no, .before = everything())  # move it before all columns
 glimpse(dat)
+
+
+
+# Estimate carbon body mass on the basis of body length ----
+cMassDat <- dat %>% 
+  select(ref_no, primRef, body_length_mm, BM_C, weight_unit) %>% 
+  # Filter for records that need carbon mass estimated - larvaceans here
+  filter(primRef == "Sato2023") %>% 
+  arrange(ref_no) %>% 
+  mutate(BM_C = calc_BMC(body_length_mm),
+         weight_unit = "ug") %>% 
+  select(-body_length_mm) 
+
+
+  # Update dat
+  dat <- dat %>%
+    left_join(cMassDat, 
+              by = c("ref_no", "primRef"), 
+              suffix = c("", "_new")) %>%
+    mutate(BM_C = coalesce(BM_C_new, BM_C), 
+           weight_unit = coalesce(weight_unit_new, weight_unit)) %>%
+    select(-ends_with("_new")) %>%
+    arrange(as.numeric(str_extract(ref_no, "\\d+")))
 
 
   # Look at all unique taxon
@@ -83,26 +106,26 @@ taxaDat <- dat %>%
 
 # Join taxa info and harmonise weight data ----
 datClean <- dat %>% 
-    left_join(taxaDat, by = "taxa") %>% 
-    rowwise() %>% 
-    mutate(BMC_mg = convert_CW(BM_C, weight_unit)) %>% # harmonize C weight data to mg
-    ungroup() %>% 
-    relocate(c(phylum, class, order, family, genus, species), .before = taxa) %>% 
-    relocate(BMC_mg, .after = BM_C) %>% 
-    mutate(zoopGrp = case_when( # Create custom groupings following Ikeda2014
-      order == "Euphausiacea"   ~ "Euphausiacea",
-      order == "Amphipoda"      ~ "Amphipoda",
-      order == "Decapoda"       ~ "Decapoda",
-      order == "Mysida"         ~ "Mysida",
-      class == "Copepoda"       ~ "Copepoda",
-      phylum == "Mollusca"      ~ "Mollusca",
-      phylum == "Chaetognatha"  ~ "Chaetognatha",
-      phylum == "Cnidaria"      ~ "Cnidaria",
-      phylum == "Ctenophora"    ~ "Ctenophora",
-      class == "Thaliacea"      ~ "Thaliacea",
-      class == "Appendicularia" ~ "Appendicularia",
-      .default = "OTHER")) %>% 
-    relocate(zoopGrp, .before = phylum)
+  left_join(taxaDat, by = "taxa") %>% 
+  rowwise() %>% 
+  mutate(BMC_mg = convert_CW(BM_C, weight_unit)) %>% # harmonize C weight data to mg
+  ungroup() %>% 
+  relocate(c(phylum, class, order, family, genus, species), .before = taxa) %>% 
+  relocate(BMC_mg, .after = BM_C) %>% 
+  mutate(zoopGrp = case_when( # Create custom groupings following Ikeda2014
+    order == "Euphausiacea"   ~ "Euphausiacea",
+    order == "Amphipoda"      ~ "Amphipoda",
+    order == "Decapoda"       ~ "Decapoda",
+    order == "Mysida"         ~ "Mysida",
+    class == "Copepoda"       ~ "Copepoda",
+    phylum == "Mollusca"      ~ "Mollusca",
+    phylum == "Chaetognatha"  ~ "Chaetognatha",
+    phylum == "Cnidaria"      ~ "Cnidaria",
+    phylum == "Ctenophora"    ~ "Ctenophora",
+    class == "Thaliacea"      ~ "Thaliacea",
+    class == "Appendicularia" ~ "Appendicularia",
+    .default = "OTHER")) %>% 
+  relocate(zoopGrp, .before = phylum)
 
   
   # Count unique ZoopGrps rates
@@ -111,7 +134,7 @@ datClean <- dat %>%
     mutate(countZGrp = sum(zoopGrp > 1, na.rm = TRUE)) %>% 
     distinct(zoopGrp, countZGrp) %>% 
     arrange(countZGrp)
-      # Appendicularia         3
+      # Appendicularia         3  - May as well remove these now
       # Mysida                14
       # Decapoda              28
       # Chaetognatha          28
@@ -130,6 +153,8 @@ datClean <- dat %>%
     summarise( 
       temp_range = paste0(min(temp_C), "-", max(temp_C)))
       # All have sensible ranges for estimating Q10, except for Mysids
+  
+
 
 # End data cleaning ----
 
@@ -139,9 +164,12 @@ datClean <- dat %>%
 datFinal <- datClean %>%
   # No need to harmoise this data (unless more is added)... so I'll use a simple mutate to maintain naming convention consistency
   mutate(Cspecific_rate = rate_value,
-         final_unit = rate_unit) %>% 
+         final_unit = rate_unit,
+         zoopGrp = as.factor(zoopGrp)) %>%
   relocate(Cspecific_rate, .after = rate_name) %>% 
-  relocate(final_unit, .after = Cspecific_rate)
+  relocate(final_unit, .after = Cspecific_rate) %>% 
+  filter(zoopGrp != "Appendicularia", # remove Appendicularia because they only have 3 data points
+         ref_no != "Pata_excl_1460") # remove this huge outlier by Kasuya2002
 glimpse(datFinal)
 
 # End conversion
@@ -151,7 +179,7 @@ glimpse(datFinal)
     ggplot() + 
     geom_point(aes(x = temp_C, 
                    y = log(Cspecific_rate), 
-                   colour = zoopGrp))
+                   colour = primRef))
   
 # Save it as an RDS for later use
 # saveRDS(datFinal, "Data/grwth_dat.rds")

@@ -8,7 +8,6 @@
   # Subset the data by target groups
   # Calculate interspecific Q10s
   # Save those Q10s and variance into a dataframe
-  # Plot the Q10s and C-specific rates for available groups
   # Generate Arrhenius plots showing the relationship between C-specific rates and temperature (for supp materials)
 
 
@@ -24,8 +23,7 @@ source("R/0_Helpers.R")
 
 
 # Read in the data ----
-dat <- readRDS("Data/grwth_dat.rds") %>% 
-  mutate(zoopGrp = as.factor(zoopGrp)) # set to factor
+dat <- readRDS("Data/grwth_dat.rds")
 
 
   # Check the temperature range for each zoopGrp
@@ -61,6 +59,7 @@ usedat <- dat %>%
       title = "Distribution of Cspecific_rate for each zooplankton group") +
     scale_x_continuous(labels = function(x) format(x, scientific = FALSE))
       # I will use this to remove extreme outliers, particularly those that don't make biological sense
+      # Some right skewed, and bimodal distributions of mass-specific rates here...
 
   
 # Custom grouping order 
@@ -158,5 +157,5 @@ growth_plot <- arrhenius_plot(
 
 growth_plot
 
-# ggsave("Output/Figure_Supp5.png", plot = growth_plot, width = 12, height = 12)
+# ggsave("Output/Figure_Supp5.png", plot = growth_plot, width = 13.5, height = 12)
 

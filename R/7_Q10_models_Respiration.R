@@ -8,7 +8,6 @@
   # Subset the data by target groups
   # Calculate interspecific Q10s
   # Save those Q10s and variance into a dataframe
-  # Plot the Q10s and C-specific rates for available groups
   # Generate Arrhenius plots showing the relationship between C-specific rates and temperature (for supp materials)
 
 

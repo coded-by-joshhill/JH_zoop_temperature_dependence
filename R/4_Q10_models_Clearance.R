@@ -9,7 +9,6 @@
   # Subset by rate type (clearance)
   # Calculate interspecific Q10s
   # Save those Q10s and variance into a dataframe
-  # Plot the Q10s and C-specific rates for available groups
   # Generate Arrhenius plots showing the relationship between C-specific rates and temperature (for supp materials)
 
 
@@ -25,8 +24,7 @@ source("R/0_Helpers.R")
 
 
 # Read in the data ----
-dat <- readRDS("Data/clear_ingest_data.rds") %>% 
-  mutate(zoopGrp = as.factor(zoopGrp)) # set to factor
+dat <- readRDS("Data/clear_ingest_data.rds")
 
 
   # Check the temperature range for each zoopGrp
@@ -160,4 +158,4 @@ clearance_plot <- arrhenius_plot(
 
 clearance_plot
 
-# ggsave("Output/Figure_Supp3.png", plot = clearance_plot, width = 12, height = 8)
+# ggsave("Output/Figure_Supp3.png", plot = clearance_plot, width = 13.5, height = 8)

@@ -186,4 +186,4 @@ p_composition <- ggplot(all_groups,
 p_composition
 
 # Save it
-ggsave("Output/Figure_Supp1.png", p_composition, width = 10, height = 8, dpi = 300, bg = "white")
+# ggsave("Output/Figure_Supp1.png", p_composition, width = 10, height = 8, dpi = 300, bg = "white")
