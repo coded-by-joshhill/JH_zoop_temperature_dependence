@@ -17,7 +17,6 @@ library(glmmTMB)
 # BODY MASS AS CARBON CALCULATOR
 # Estimate carbon weight using an allometric equation
 calc_BMC <- function(bodyLength_mm) {
-  
   # Following Jaspers et al. 2009, use the slope (2.455), intercept (-6.96), and trunk length (TL) to estimate carbon mass
   # where, logC (ugC) = 2.455 log TL(um) -6.96.... located in Table 1 and Figure 2 - DOI: 10.1093/plankt/fbp002 
   # therefore... C (ugC) = 10^-6.96 * (bodyLength (mm) * 1000) ^ 2.455
@@ -80,6 +79,19 @@ convert_ingestion <- function(rate, unit) {
 # END OF INGESTION CONVERTER
 
 
+# GROWTH CALCULATOR ----
+# Estimate growth
+calcGrowthRate <- function(mass1, mass0, time) {
+  # Following McConville and colleagues (2017), estimate growth using:
+  # G = (M1 - M0) / t
+  # Where M1 is mass at a time, M0 is mass at the previous time point, and t is the time period between the two measurements
+  G = (mass1 - mass0) / time
+  
+  return(G)
+}
+# END OF GROWTH CALCULATOR
+
+
 
 # RESPIRATION CONVERTER ----
 # Convert respiration rates to ulO2/ind/hr
@@ -131,6 +143,8 @@ boot_Q10 <- function(df) {
   df_id <- sample(1:nrow(df), nrow(df), replace = TRUE) # A random sample of rows of df (with replacement) of same size as df
   d <- df[df_id,] # Get those random rows
   out <- glmmTMB(y ~ x * zoopGrp + (1|primRef) + (1|taxa),  data = d) # fit the model
+  
+  return(out)
 }
 # END OF BOOTSTRAP MODEL FUNCTION
 

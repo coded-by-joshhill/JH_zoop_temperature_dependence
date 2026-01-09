@@ -44,7 +44,7 @@ respDat <- readRDS("Data/resp_dat.rds") %>%
 
 Q10Dat <- readRDS("Data/historicQ10_dat.rds") %>% 
   filter(!phylum == "Rotifera") %>% 
-  mutate(zoopGrp = case_when( # Create custom groupings following Ikeda2014
+  mutate(zoopGrp = case_when( # Create custom groupings following Ikeda2014 (as was done for rate data)
     order == "Euphausiacea"   ~ "Euphausiacea",
     order == "Amphipoda"      ~ "Amphipoda",
     order == "Decapoda"       ~ "Decapoda",
@@ -175,7 +175,7 @@ Europe <- ggplot() +
         panel.grid = element_blank(),
         plot.tag = element_text(size = 14, face = "bold"))
 Europe
-# ggsave("Output/Figure_1.2.png", plot = Europe, height = 8)
+# ggsave("Output/Figure_1.2.png", plot = Europe, height = 3.5)
 
 
 
@@ -203,7 +203,7 @@ NorthOceans <- ggplot() +
         plot.tag = element_text(size = 14, face = "bold"))
 
 NorthOceans
-# ggsave("Output/Figure_1.3.png", plot = NorthOceans, height = 8)
+# ggsave("Output/Figure_1.3.png", plot = NorthOceans, height = 3.5)
 
 
 # Submap 3: NWPacific
@@ -229,7 +229,7 @@ NWPacific <- ggplot() +
         panel.grid = element_blank(),
         plot.tag = element_text(size = 14, face = "bold"))
 NWPacific
-# ggsave("Output/Figure_1.4.png", plot = NWPacific, height = 6)
+# ggsave("Output/Figure_1.4.png", plot = NWPacific, height = 4)
 
 
 # Submap 4: Southern Ocean
@@ -270,7 +270,7 @@ SOcean
     (SOcean + 
        plot_layout(widths = c(.8, .1))))
 
-  # This looks OK but for now I'll do the illustration in Inkscape...
+  # This looks OK... but for now I'll do the illustration in Inkscape...
 
 
 # Regional representation of mapped data ----

@@ -23,8 +23,7 @@ source("R/0_Helpers.R")
 
 
 # Read in the data ----
-dat <- readRDS("Data/resp_dat.rds") %>% 
-  mutate(zoopGrp = as.factor(zoopGrp)) # set to factor
+dat <- readRDS("Data/resp_dat.rds") 
 
 
   # Check the temperature range for each zoopGrp
@@ -155,4 +154,4 @@ respiration_plot <- arrhenius_plot(
 
 respiration_plot
 
-# ggsave("Output/Figure_Supp6.png", plot = respiration_plot, width = 12, height = 8)
+# ggsave("Output/Figure_Supp6.png", plot = respiration_plot, width = 13.5, height = 8)

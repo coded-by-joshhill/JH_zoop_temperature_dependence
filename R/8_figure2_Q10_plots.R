@@ -4,9 +4,8 @@
 
 
 
-  # Here I read in all Q10 estimations
-  # Plot Q10 and CMass-Specific rates
-  # Plot Arrhenius plots
+  # Here I read in all Q10 estimates
+  # Plot Q10
 
 
 

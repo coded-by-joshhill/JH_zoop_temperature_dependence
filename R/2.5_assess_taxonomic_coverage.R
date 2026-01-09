@@ -53,8 +53,8 @@ respiration <- readRDS("Data/resp_dat.rds") %>%
 
 
 # Taxonomic coverage summary ----
-# Calculate coverage for each dataset using custom function
-  # The function takes the dataset and assigns a it name, then generates simple summaries
+# Calculate coverage for each dataset
+  # The custom function takes the dataset and assigns a it name, then generates simple summaries
 clearance_coverage <- summarise_taxonomic_coverage(clearance, "Clearance")
 ingestion_coverage <- summarise_taxonomic_coverage(ingestion, "Ingestion")
 growth_coverage <- summarise_taxonomic_coverage(growth, "Growth")
@@ -113,7 +113,7 @@ coverage_table
 
 
 # Taxonomic composition by zoopGrp ----
-# Show the distribution of species across major taxonomic groups relative to each rate process
+# Show the spread of species across major taxonomic groups relative to each rate process
 
 # Calculate for each dataset
 clearance_by_group <- clearance %>%

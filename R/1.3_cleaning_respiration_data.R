@@ -21,7 +21,7 @@ source("R/0_Helpers.R")
 
 
 # Read in the data ----
-dat <- read_csv("https://www.dropbox.com/scl/fi/itv9vpnu8twxz2fyhmp1u/Resp_dat.csv?rlkey=9fig4vcw2cog4rc4qa6mtj7lj&st=p6gcxo9y&dl=1", 
+dat <- read_csv("https://www.dropbox.com/scl/fi/itv9vpnu8twxz2fyhmp1u/Resp_dat.csv?rlkey=9fig4vcw2cog4rc4qa6mtj7lj&st=6rhjjioa&dl=1", 
                 skip = 1) %>%
   mutate(ref_no = if_else(is.na(ref_no) | ref_no == "", # if the value is NA or empty...
                           paste0("Hill_", row_number()), # apply a unique reference number
@@ -44,7 +44,7 @@ glimpse(dat)
     group_by(rate_name) %>% 
     distinct(primRef, rate_name) %>% 
     summarise(count = n())
-      # 22 records
+      # 23 records
 
   
 
@@ -121,7 +121,7 @@ datClean <- dat %>%
       # Thaliacea           88
       # Euphausiacea       236
       # Cnidaria           241
-      # Copepoda           290
+      # Copepoda           379
   
   
   # Check the temperature range for each zoopGrp
@@ -160,8 +160,9 @@ datFinal <- datClean %>%
     TRUE ~ NA_real_),
     final_unit = case_when(
       rate_name == "RespirationRate" & !is.na(Cspecific_rate) ~ "ulO2/mgC/hr",
-      TRUE ~ rate_unit_fin)) %>%
-  #select(-.conv, -rate_value_fin, -rate_unit_fin) %>% 
+      TRUE ~ rate_unit_fin),
+    zoopGrp = as.factor(zoopGrp)) %>%
+  select(-.conv, -rate_value_fin, -rate_unit_fin) %>%
   relocate(Cspecific_rate, .after = rate_name) %>% 
   relocate(final_unit, .after = Cspecific_rate)
 glimpse(datFinal)
