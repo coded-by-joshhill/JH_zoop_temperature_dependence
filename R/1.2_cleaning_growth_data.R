@@ -77,6 +77,12 @@ dat <- read_csv("https://www.dropbox.com/scl/fi/gdllcg9d1dx1dzf38pckd/Grwth_dat.
   relocate(ref_no, .before = everything())  # move it before all columns
 glimpse(dat)
 
+  
+  # Count number of initial pre-cleaned records
+  dat %>% group_by(rate_name) %>% 
+    summarise(count = n())
+  # GrowthRate  686
+
 
   # Look at all unique taxon
   dat %>% 

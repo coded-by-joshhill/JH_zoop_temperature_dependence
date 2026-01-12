@@ -30,6 +30,12 @@ dat <- read_csv("https://www.dropbox.com/scl/fi/itv9vpnu8twxz2fyhmp1u/Resp_dat.c
   relocate(ref_no, .before = everything())  # move it before all columns
 glimpse(dat)
 
+  
+  # Count number of initial pre-cleaned records
+  dat %>% group_by(rate_name) %>% 
+    summarise(count = n())
+  # RespirationRate  1036
+
 
   # Look at all unique taxon
   dat %>% 

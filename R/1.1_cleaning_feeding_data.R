@@ -50,6 +50,13 @@ cMassDat <- dat %>%
            weight_unit = coalesce(weight_unit_new, weight_unit)) %>%
     select(-ends_with("_new")) %>%
     arrange(as.numeric(str_extract(ref_no, "\\d+")))
+  
+  
+  # Count number of initial pre-cleaned records
+  dat %>% group_by(rate_name) %>% 
+    summarise(count = n())
+    # ClearanceRate  1580
+    # IngestionRate   471
 
 
   # Look at all unique ClearanceRate taxon
