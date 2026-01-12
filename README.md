@@ -1,21 +1,27 @@
 # JH_zoop_temperature_dependence
 
-A repository for munging zooplankton rate process data and estimating Q10.
+A repository for 'A global synthesis of the temperature dependence of feeding, growth, and metabolism across marine zooplankton' - data cleaning and analysis estimating Q10.
 
-The rate process data for this project consists of respiration, ingestion and clearance, and growth. Data was compiled by previous meta-analyses and extracted from more recent scientific articles.
+The rate process data for this project consists of respiration, ingestion and clearance, and growth. Data was compiled by previous scientific articles.
 
 # Folder structure
 
 ## Data
 
-Here we save data files such as RDS and/or small csv files. Other data used in the analysis are provided via web links.
+Here we save data files such as RDS. Other data used in the analysis are provided via web links.
 
-| Files | Description |
-|-------------------|-----------------------------------------------------|
-| xyz_data.rds | These data files are cleaned rate process and Q10 data. |
-| Q10_estimates_xyz.rds | These files are Q10 estimate output generated using bootstrap models. |
-| Q10_summary_xyz.rds | These files are Q10 summaries which include Q10 estimates and confidence intervals which are estimated using the bootstrap models output. |
-|  |  |
++-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------+
+| Files                 | Description                                                                                                                               |
++=======================+===========================================================================================================================================+
+| x_y_z_data.rds &\     | These data files are cleaned rate process and Q10 data.                                                                                   |
+| historicQ10_dat.rds   |                                                                                                                                           |
++-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------+
+| xyz_mdat.rds          | These files are modelling data frames that are used for plotting.                                                                         |
++-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------+
+| Q10_estimates_xyz.rds | These files are Q10 estimate output generated using bootstrap models.                                                                     |
++-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------+
+| Q10_summary_xyz.rds   | These files are Q10 summaries which include Q10 estimates and confidence intervals which are estimated using the bootstrap models output. |
++-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------+
 
 ## R
 
@@ -57,9 +63,9 @@ This folder contains all .R scripts that are used to perform data cleaning and a
 
     -   Third, we use bootstrap resampling (n = 9,999) and parellel processing with the package *purrr* to fit Generalised Linear Mixed Models with the Template Model Builder (using the *glmmTMB* package) with zooplankton group as a fixed effect and two random effects (primary author and taxa).
 
-    -   Fourth, we extract the slopes from all models for each zoopGroup and estimate median Q~10~ coefficients following the Arrhenius equation.
+    -   Fourth, we extract the slopes from all models for each zoopGroup and estimate median Q10 coefficients following the Arrhenius equation.
 
-    -   Fifth, we estimate the 95% confidence intervals for Q~10~ estimates using coefficients from the boostrap models output.
+    -   Fifth, we estimate the 95% confidence intervals for Q10 estimates using coefficients from the boostrap models output.
 
     -   Finally, we save the data for a final visualisation and then generate inverse Arrhenius plots to illustrate the relationship between temperature and carbon mass-specific clearance rates for each zooplankton group available.
 
@@ -69,14 +75,10 @@ This folder contains all .R scripts that are used to perform data cleaning and a
 
 -   **7_Q10_models_Respiration:** This script follows the same workflow as script 4, but for respiration.
 
--   **8_figure2_Q10_plots.R:** This script combines all Q10 data for each rate and generates dot plots to illustrate median Q~10~ (95% confidence intervals) for each zooplankton group with available data.
+-   **8_figure2_Q10_plots.R:** This script combines all Q10 data for each rate and generates dot plots to illustrate median Q10 (95% confidence intervals) for each zooplankton group with available data.
 
 ## Output
 
 A folder to save any outputs such as preliminary figures and tables etc.
-
-## Quarto
-
-A folder for any Quarto documents generated from the scripts.
 
 ## 
