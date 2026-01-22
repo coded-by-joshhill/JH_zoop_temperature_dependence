@@ -187,3 +187,31 @@ p_composition
 
 # Save it
 # ggsave("Output/Figure_Supp1.png", p_composition, width = 10, height = 8, dpi = 300, bg = "white")
+
+
+# What proportion of the data is between 0 and 30 degC? ----
+# Quick function to select data across each dataset
+temp_dat_summary <- function(data, dataset_name) {
+  data %>%
+    select(temp_C) %>%
+    mutate(Dataset = dataset_name)
+}
+
+
+# Bind all the data into a tibble
+tempDat_binded <- bind_rows(
+  temp_dat_summary(respiration, "respiration"),
+  temp_dat_summary(growth, "growth"),
+  temp_dat_summary(clearance, "clearance"),
+  temp_dat_summary(ingestion, "ingestion"))
+
+
+# Summarise the data and calculate the proportion of data between 0 and 30 degC
+tempDat_binded %>%
+  summarise(
+    n_total = n(),
+    n_temp_range = sum(temp_C >= 0 & temp_C <= 30, na.rm = TRUE),
+    prop_temp_range = n_temp_range / n_total)
+
+tempDat_binded
+  # 94.3% of the data is between 0 and 30
