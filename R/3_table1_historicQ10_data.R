@@ -187,12 +187,15 @@ meanQ10s<- ggplot() +
   labs(x = expression(bold("Zooplankton group")),
        y = expression(bold("Temperature senstivitiy (Q"[10] *")"))) +
   scale_y_continuous(breaks = seq(1, 8, by = 1)) +
-  theme(axis.text = element_text(size = 10),
-        legend.position = "right") +
-  coord_flip()
+  theme(axis.text = element_text(size = 9),
+        legend.position = "right",
+        strip.text = element_text(size = 10, face = "bold")) +
+  coord_flip() +
+  scale_x_discrete(limits = rev(levels(summary_data$zoopGrp)))
+
 meanQ10s
 
-# ggsave("Output/Figure_Supp2.png", plot = meanQ10s, width = 180, height = 220, units = "mm")
+# ggsave("Output/Figure_2_toEdit.pdf", plot = meanQ10s, width = 140, height = 160, units = "mm")
+# ggsave("Output/Figure_2_toEdit.png", plot = meanQ10s, width = 140, height = 160, units = "mm")
 
-  
   

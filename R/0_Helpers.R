@@ -257,7 +257,7 @@ get_results <- function(df, groups, coefs_list, Q10pdat) {
 
 
 # ARRHENIUS PLOT FUNCTION ----
-arrhenius_plot <- function(mdat, rate_col, boot_models, Q10pdat, 
+arrhenius_plot <- function(mdat, rate_col, results, 
                            group_order = NULL, x_limits = NULL, ncol = 3) {
   
   # Prepare data for plotting
@@ -270,14 +270,16 @@ arrhenius_plot <- function(mdat, rate_col, boot_models, Q10pdat,
     
     #Calculate sample size and number of taxa
     n_obs <- nrow(df_data)
-
+    
+    # Create the label for annotation
     list(
       data = df_data %>% mutate(zoopGrp = g),
       pred = df_pred %>% mutate(zoopGrp = g),
-      Q10_label = paste0("Q10 = ", round(df_Q10$Q10, 2),
-                         " (95% CI: ", round(df_Q10$CI_lower, 2), " - ",
-                         round(df_Q10$CI_upper, 2), "); n = ", n_obs)
-    )
+      Q10_label = paste0(
+        "Q[10] == ", round(df_Q10$Q10, 2),
+        " * ' (95% CI: ", round(df_Q10$CI_lower, 2), " - ",
+        round(df_Q10$CI_upper, 2), "); n = ", n_obs, "'")
+      )
   })
   
   # Remove NULLs
@@ -313,27 +315,32 @@ arrhenius_plot <- function(mdat, rate_col, boot_models, Q10pdat,
   
   # Create the plot
   p <- ggplot() +
+    # Add the raw data
     geom_point(data = all_data, aes(x = x, y = .data[[rate_col]]), 
                alpha = 0.3, size = 2) +
+    # Add the confidence ribbons
     geom_ribbon(data = all_pred, aes(x = x, ymin = conf.low, ymax = conf.high),
                 fill = "grey", alpha = 0.3) +
+    # Add the fit
     geom_line(data = all_pred, aes(x = x, y = predicted), 
               colour = "darkblue", linewidth = 1, linetype = "dashed") +
+    # Add the annotation
     geom_text(data = all_labels, aes(x = x, y = y, label = label), 
-              hjust = 0, vjust = 1.5, size = 4, colour = "darkblue") +
+              parse = TRUE, hjust = 0, vjust = 1.5, size = 4, colour = "darkblue") +
     scale_x_continuous(name = expression(bold("1 / Temp (K"^-1*")")),
                        trans = "reverse",
                        sec.axis = sec_axis(~1/. - 273.15, name = "Temp (°C)")) +
     facet_wrap(~ zoopGrp, scales = "free_y", ncol = ncol) +
     coord_cartesian(xlim = x_limits) +
     theme_bw() +
-    theme(axis.title.x = element_text(size = 14),
-          axis.title.y = element_text(size = 14),
-          axis.title.x.top = element_text(size = 14, face = "bold"),
+    theme(axis.title.x = element_text(size = 15),
+          axis.title.y = element_text(size = 15),
+          axis.title.x.top = element_text(size = 15, face = "bold"),
           axis.text = element_text(size = 12),
           strip.text = element_text(size = 12, face = "bold"),
           panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank())
+          panel.grid.minor = element_blank(),
+          plot.margin = margin(t = 5, r = 15, b = 5, l = 5))
   
   return(p)
 }

@@ -85,4 +85,7 @@ jointPlots <- annotate_figure(jointPlots,
 jointPlots
 
 # Save it
-# ggsave("Output/Figure_2.png", plot = jointPlots, width = 8, height = 8, background = "white")
+# ggsave("Output/Figure_3.png", plot = jointPlots, width = 8, height = 8, background = "white")
+# ggsave("Output/Figure_3.pdf", plot = jointPlots, width = 8, height = 8)
+
+

@@ -9,7 +9,7 @@
   # Subset by rate type (ingestion)
   # Calculate interspecific Q10s
   # Save those Q10s and variance into a dataframe
-  # Generate Arrhenius plots showing the relationship between C-specific rates and temperature (for supp materials)
+  # Save Arrhenius plot object for later plotting
 
 
 
@@ -17,8 +17,6 @@
 library(tidyverse)
 library(parallel)
 library(DHARMa) 
-library(ggeffects)
-library(patchwork)
 source("R/0_Helpers.R")
 
 
@@ -132,7 +130,7 @@ Q10pdat
 
 
 
-# Create Arrhenius plots ----
+# Create Arrhenius plots data ----
 # Extract coefficients from all bootstrap models
 coefs_list <- map(boot_models, ~fixef(.x)$cond)
 
@@ -142,16 +140,13 @@ groups <- levels(mdat$zoopGrp)
 # Extract results using get_results function
 results <- get_results(mdat, groups, coefs_list, Q10pdat)
 
-# Plot it up
-ingestion_plot <- arrhenius_plot(
-  mdat = mdat,
-  rate_col = "Cspecific_rate",
-  boot_models = boot_models,
-  Q10pdat = Q10pdat,
-  group_order = group_order,
-  x_limits = c(0.0037, 0.0033)) +
-  labs(y = expression(bold("Ingestion rate (mgC mgC"^-1*" h"^-1*")")))
+# Arrhenius object 
+arrhenius_obj <- list(
+  mdat    = mdat[, c("zoopGrp", "x", "Cspecific_rate")],
+  results = results,
+  group_order = group_order)
 
-ingestion_plot
+# Save object for plotting
+saveRDS(arrhenius_obj, "Data/ingestion_arrhenius_plot_data.rds")
 
-# ggsave("Output/Figure_Supp4.png", plot = ingestion_plot, width = 13.5, height = 5)
+

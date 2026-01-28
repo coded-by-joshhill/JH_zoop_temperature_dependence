@@ -186,7 +186,10 @@ p_composition <- ggplot(all_groups,
 p_composition
 
 # Save it
-# ggsave("Output/Figure_Supp1.png", p_composition, width = 10, height = 8, dpi = 300, bg = "white")
+# ggsave("Output/Figure_Supp1.png", p_composition, width = 180, height = 180, units = "mm", dpi = 300, bg = "white")
+# ggsave("Output/Figure_Supp1.pdf", p_composition, width = 180, height = 180, units = "mm", dpi = 300)
+
+
 
 
 # What proportion of the data is between 0 and 30 degC? ----
@@ -211,7 +214,32 @@ tempDat_binded %>%
   summarise(
     n_total = n(),
     n_temp_range = sum(temp_C >= 0 & temp_C <= 30, na.rm = TRUE),
-    prop_temp_range = n_temp_range / n_total)
+    prop_temp_range = n_temp_range / n_total * 100)
+    # 94.3% of the data is between 0 and 30
 
-tempDat_binded
-  # 94.3% of the data is between 0 and 30
+
+
+# What proportion of each dataset had the method report? ----
+# Quick function to select data across each dataset
+food_dat_summary <- function(data, dataset_name) {
+  data %>%
+    select(ref_no, food_type, food_conc, method) %>%
+    mutate(Dataset = dataset_name)
+}
+
+
+# Bind all the data into a tibble
+foodDat_binded <- bind_rows(
+  food_dat_summary(respiration, "respiration"),
+  food_dat_summary(growth, "growth"),
+  food_dat_summary(clearance, "clearance"),
+  food_dat_summary(ingestion, "ingestion"))
+
+
+# Summarise the experiment method data and calculate the proportions reported and not reported.
+foodDat_binded %>% 
+  mutate(method = if_else(is.na(method), "Not reported", method)) %>%
+  group_by(Dataset, method) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(Dataset) %>%
+  mutate(prop_method = n / sum(n) * 100)
