@@ -1,6 +1,6 @@
 # Cleaning clearance and ingestion data
 # Josh Hill
-# 16/09/25
+# 03/02/26
 
 
 
@@ -15,7 +15,6 @@
 # Packages and helpers ----
 library(tidyverse)
 library(worrms)
-library(janitor)
 source("R/0_Helpers.R")
 
 
@@ -133,36 +132,57 @@ datClean <- dat %>%
     relocate(c(phylum, class, order, family, genus, species), .before = taxa) %>% 
     relocate(BMC_mg, .after = BM_C) %>% 
     mutate(
-      # Create custom groupings for general zoop groups following Ikeda 2014
-      zoopGrp = case_when( 
-        order == "Euphausiacea"   ~ "Euphausiacea",
-        order == "Amphipoda"      ~ "Amphipoda",
-        order == "Decapoda"       ~ "Decapoda",
-        order == "Mysida"         ~ "Mysida",
-        class == "Copepoda"       ~ "Copepoda",
-        phylum == "Mollusca"      ~ "Mollusca",
-        phylum == "Chaetognatha"  ~ "Chaetognatha",
-        phylum == "Cnidaria"      ~ "Cnidaria",
-        phylum == "Ctenophora"    ~ "Ctenophora",
-        class == "Thaliacea"      ~ "Thaliacea",
-        class == "Appendicularia" ~ "Appendicularia",
-        .default = "OTHER"),
-
       # Create custom size groupings following Grigoratou et al. 2025 Figure 1
       sizeGrp = case_when(
         # Mesoplankton: 0.2 um - 20 mm
+        class == "Appendicularia"  ~ "Mesoplankton", # grouped here because we only have Oikopleura dioica
         class == "Copepoda"        ~ "Mesoplankton",
-        class == "Appendicularia"  ~ "Mesoplankton", # put under meso because we only have O. dioica
+        order == "Pteropoda"       ~ "Mesoplankton", # grouped here because they are Pteropods
         # Macroplankton: 20 mm - 200 mm
-        class == "Malacostraca"    ~ "Macroplankton",
-        class == "Scyphozoa"       ~ "Macroplankton",
-        class == "Hydrozoa"        ~ "Macroplankton",
-        class == "Tentaculata"     ~ "Macroplankton",
-        class == "Thaliacea"       ~ "Macroplankton",
-        class == "Sagittoidea"     ~ "Macroplankton",
-        .default = "OTHER")) %>% 
+        phylum == "Annelida"      ~ "Macroplankton", # grouped here because Tomopteris carpenteri is a larger sp.
+        phylum == "Chaetognatha"  ~ "Macroplankton",
+        phylum == "Cnidaria"      ~ "Macroplankton",
+        phylum == "Ctenophora"    ~ "Macroplankton",
+        class == "Hydrozoa"       ~ "Macroplankton",
+        class == "Malacostraca"   ~ "Macroplankton",
+        class == "Thaliacea"      ~ "Macroplankton",
+        .default = "OTHER"),
+      
+      # Create custom functional groups based on feeding modes
+      funcGrp = case_when(
+        # Crustaceans
+        phylum == "Annelida"      ~ "Crustaceans",
+        class == "Copepoda"       ~ "Crustaceans",
+        class == "Malacostraca"   ~ "Crustaceans",
+        # Gelatinous filter-feeders
+        class == "Appendicularia" ~ "GelFilter",
+        class == "Thaliacea"      ~ "GelFilter",
+        # Gelatinous predators
+        phylum == "Cnidaria"      ~ "GelPreds",
+        phylum == "Ctenophora"    ~ "GelPreds",
+        phylum == "Chaetognatha"  ~ "GelPreds", # grouped with GelPreds because  although not full-gelatinous, this makes more sense than crustaceans
+        .default = "OTHER"),
+
+      # Create custom groupings for general zoop groups following Ikeda 2014
+      zoopGrp = case_when( 
+        phylum == "Annelida"      ~ "Annelids",
+        phylum == "Chaetognatha"  ~ "Chaetognaths",
+        phylum == "Cnidaria"      ~ "Cnidarians",
+        phylum == "Ctenophora"    ~ "Ctenophores",
+        phylum == "Mollusca"      ~ "Molluscs",
+        phylum == "Rotifera"      ~ "Rotifers",
+        class == "Appendicularia" ~ "Appendicularians",
+        class == "Copepoda"       ~ "Copepods",
+        class == "Thaliacea"      ~ "Thaliaceans",
+        order == "Euphausiacea"   ~ "Euphausiids",
+        order == "Amphipoda"      ~ "Amphipods",
+        order == "Decapoda"       ~ "Decapods",
+        order == "Mysidacea"      ~ "Mysids",
+        .default = "OTHER"),
+      ) %>% 
     relocate(zoopGrp, .before = phylum) %>% 
-    relocate(sizeGrp, .before = zoopGrp)
+    relocate(sizeGrp, .before = zoopGrp) %>% 
+    relocate(funcGrp, .before = sizeGrp)
 
   
   # Count unique ZoopGrps rates for ClearanceRate
@@ -172,13 +192,13 @@ datClean <- dat %>%
     mutate(countZGrp = sum(zoopGrp > 1, na.rm = TRUE)) %>% 
     distinct(zoopGrp, countZGrp) %>% 
     arrange(countZGrp)
-      # Chaetognatha           4
-      # Ctenophora            58
-      # Appendicularia        60
-      # Euphausiacea         201
-      # Copepoda             243
-      # Thaliacea            286
-      # Cnidaria             334
+    # 1 Chaetognaths             4
+    # 2 Ctenophores             58
+    # 3 Appendicularians        60
+    # 4 Euphausiids            201
+    # 5 Copepods               243
+    # 6 Thaliaceans            286
+    # 7 Cnidarians             334
   
   
   # Check the temperature range for each zoopGrp
@@ -197,13 +217,13 @@ datClean <- dat %>%
     mutate(countZGrp = sum(zoopGrp > 1, na.rm = TRUE)) %>% 
     distinct(zoopGrp, countZGrp) %>% 
     arrange(countZGrp)
-      # Appendicularia         6
-      # Cnidaria               6
-      # Ctenophora            35
-      # Chaetognatha          79
-      # Thaliacea             81
-      # Euphausiacea          91
-      # Copepoda             173
+    # 1 Appendicularians         6
+    # 2 Cnidarians               6
+    # 3 Ctenophores             35
+    # 4 Chaetognaths            79
+    # 5 Thaliaceans             81
+    # 6 Euphausiids             91
+    # 7 Copepods               173
   
   
   # Check the temperature range for each zoopGrp
@@ -213,7 +233,7 @@ datClean <- dat %>%
     filter(rate_name == "IngestionRate") %>% 
     summarise( 
       temp_range = paste0(min(temp_C), "-", max(temp_C)))
-      # All have sensible ranges for estimating Q10, except for Cnidaria and Ctenophora
+      # All have sensible ranges for estimating Q10, except for Cnidarians and Ctenophores
 
 # End data cleaning ----
     
@@ -238,7 +258,6 @@ datFinal <- datClean %>%
     rate_unit_fin  = .conv$unit) %>%
   ungroup() %>%
       
-  
   # Convert to mass-specific rates
   mutate(Cspecific_rate = case_when(
     rate_name == "ClearanceRate" & rate_unit_fin == "ml/mgC/hr"                   ~ rate_value_fin,
@@ -250,6 +269,8 @@ datFinal <- datClean %>%
       rate_name == "ClearanceRate" & !is.na(Cspecific_rate) ~ "ml/mgC/hr",
       rate_name == "IngestionRate" & !is.na(Cspecific_rate) ~ "mgC/mgC/hr",
       TRUE ~ rate_unit_fin),
+    sizeGrp = as.factor(sizeGrp),
+    funcGrp = as.factor(funcGrp),  
     zoopGrp = as.factor(zoopGrp)) %>%
   select(-.conv, -rate_value_fin, -rate_unit_fin) %>% 
   relocate(Cspecific_rate, .after = rate_name) %>% 
@@ -258,13 +279,32 @@ glimpse(datFinal)
 
 # End conversion
 
-  # Final check
-  datFinal %>% 
-    ggplot() + 
-    geom_point(aes(x = temp_C, 
-                   y = log(Cspecific_rate), 
-                   colour = zoopGrp)) +
-    facet_wrap(~ rate_name, scales ="free")
+# Final checks
+# sizeGrp
+datFinal %>% 
+  ggplot() + 
+  geom_point(aes(x = temp_C, 
+                 y = log(Cspecific_rate), 
+                 colour = sizeGrp)) +
+  facet_wrap(~ rate_name, scales ="free")
+
+
+# funcGrp
+datFinal %>% 
+  ggplot() + 
+  geom_point(aes(x = temp_C, 
+                 y = log(Cspecific_rate), 
+                 colour = funcGrp)) +
+  facet_wrap(~ rate_name, scales ="free")
+
+
+# zoopGrp
+datFinal %>% 
+  ggplot() + 
+  geom_point(aes(x = temp_C, 
+                 y = log(Cspecific_rate), 
+                 colour = zoopGrp)) +
+  facet_wrap(~ rate_name, scales ="free")
 
 # Save it as an RDS for later use
 # saveRDS(datFinal, "Data/clear_ingest_data.rds")

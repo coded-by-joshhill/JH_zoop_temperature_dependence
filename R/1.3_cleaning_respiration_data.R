@@ -1,6 +1,6 @@
 # Cleaning respiration data
 # Josh Hill
-# 12/11/25
+# 03/02/26
 
 
 
@@ -15,7 +15,6 @@
 # Packages and helpers ----
 library(tidyverse)
 library(worrms)
-library(janitor)
 source("R/0_Helpers.R")
 
 
@@ -94,23 +93,58 @@ datClean <- dat %>%
     mutate(BMC_mg = convert_CW(BM_C, weight_unit)) %>% # harmonize C weight data to mg
     ungroup() %>% 
     relocate(c(phylum, class, order, family, genus, species), .before = taxa) %>% 
-    relocate(BMC_mg, .after = BM_C) %>% 
-    mutate(zoopGrp = case_when( # Create custom groupings following Ikeda2014
-      order == "Euphausiacea"   ~ "Euphausiacea",
-      order == "Amphipoda"      ~ "Amphipoda",
-      order == "Decapoda"       ~ "Decapoda",
-      order == "Mysida"         ~ "Mysida",
-      class == "Copepoda"       ~ "Copepoda",
-      phylum == "Mollusca"      ~ "Mollusca",
-      phylum == "Chaetognatha"  ~ "Chaetognatha",
-      phylum == "Cnidaria"      ~ "Cnidaria",
-      phylum == "Ctenophora"    ~ "Ctenophora",
-      phylum == "Annelida"      ~ "Annelida",
-      class == "Thaliacea"      ~ "Thaliacea",
-      class == "Appendicularia" ~ "Appendicularia",
-      .default = "OTHER")) %>% 
-    relocate(zoopGrp, .before = phylum)
-
+    relocate(BMC_mg, .after = BM_C) %>%
+    mutate(
+      # Create custom size groupings following Grigoratou et al. 2025 Figure 1
+      sizeGrp = case_when(
+        # Mesoplankton: 0.2 um - 20 mm
+        class == "Copepoda"       ~ "Mesoplankton",
+        order == "Pteropoda"       ~ "Mesoplankton", # grouped here because they are Pteropods
+        # Macroplankton: 20 mm - 200 mm
+        phylum == "Annelida"      ~ "Macroplankton", # grouped here because Tomopteris carpenteri is a larger sp.
+        phylum == "Cnidaria"      ~ "Macroplankton",
+        phylum == "Ctenophora"    ~ "Macroplankton",
+        class == "Malacostraca"   ~ "Macroplankton",
+        class == "Thaliacea"      ~ "Macroplankton",
+        class == "Sagittoidea"    ~ "Macroplankton",
+        order == "Oegopsida"      ~ "Macroplankton", # larger Mollusc
+        .default = "OTHER"),
+      
+      # Create custom functional groups based on feeding modes
+      funcGrp = case_when(
+        # Crustaceans
+        class == "Malacostraca"   ~ "Crustaceans",
+        class == "Copepoda"       ~ "Crustaceans",
+        phylum == "Annelida"      ~ "Crustaceans",
+        # Gelatinous filter-feeders
+        class == "Thaliacea"      ~ "GelFilter",
+        # Gelatinous predators
+        phylum == "Cnidaria"      ~ "GelPreds",
+        phylum == "Ctenophora"    ~ "GelPreds",
+        phylum == "Chaetognatha"  ~ "GelPreds", # grouped with GelPreds because  although not full-gelatinous, this makes more sense than crustaceans
+        phylum == "Mollusca"      ~ "GelPreds",
+        .default = "OTHER"),
+      
+      # Create custom groupings for general zoop groups following Ikeda 2014
+      zoopGrp = case_when( 
+        order == "Euphausiacea"   ~ "Euphausiacea",
+        order == "Amphipoda"      ~ "Amphipoda",
+        order == "Decapoda"       ~ "Decapoda",
+        order == "Mysida"         ~ "Mysida",
+        class == "Copepoda"       ~ "Copepoda",
+        phylum == "Mollusca"      ~ "Mollusca",
+        phylum == "Chaetognatha"  ~ "Chaetognatha",
+        phylum == "Cnidaria"      ~ "Cnidaria",
+        phylum == "Ctenophora"    ~ "Ctenophora",
+        class == "Thaliacea"      ~ "Thaliacea",
+        class == "Appendicularia" ~ "Appendicularia",
+        phylum == "Annelida"      ~ "Annelida",
+        .default = "OTHER"),
+    ) %>% 
+    relocate(zoopGrp, .before = phylum) %>% 
+    relocate(sizeGrp, .before = zoopGrp) %>% 
+    relocate(funcGrp, .before = sizeGrp)
+    
   
   # Count unique ZoopGrps rates
   datClean %>% 
@@ -175,12 +209,29 @@ glimpse(datFinal)
 
 # End conversion
 
-  # Final check
-  datFinal %>% 
-    ggplot() + 
-    geom_point(aes(x = temp_C, 
-                   y = log(Cspecific_rate), 
-                   colour = zoopGrp))
+# Final checks
+# sizeGrp
+datFinal %>% 
+  ggplot() + 
+  geom_point(aes(x = temp_C, 
+                 y = log(Cspecific_rate), 
+                 colour = sizeGrp))
+
+
+# funcGrp
+datFinal %>% 
+  ggplot() + 
+  geom_point(aes(x = temp_C, 
+                 y = log(Cspecific_rate), 
+                 colour = funcGrp))
+
+
+# zoopGrp
+datFinal %>% 
+  ggplot() + 
+  geom_point(aes(x = temp_C, 
+                 y = log(Cspecific_rate), 
+                 colour = zoopGrp))
 
 # Save as RDS for later use
 # saveRDS(datFinal, "Data/resp_dat.rds")

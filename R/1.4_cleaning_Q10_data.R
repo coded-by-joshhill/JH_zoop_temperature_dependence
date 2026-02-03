@@ -1,6 +1,6 @@
 # Cleaning historic Q10 data
 # Josh Hill
-# 14/11/25
+# 03/02/26
 
 
 
@@ -15,7 +15,6 @@
 # Packages and helpers ----
 library(tidyverse)
 library(worrms)
-library(janitor)
 source("R/0_Helpers.R")
 
 
@@ -29,7 +28,6 @@ dat <- read_csv("https://www.dropbox.com/scl/fi/qsach648tlqobvimd34ra/Historic_Q
                        .default = rate)) %>% 
   relocate(ref_no, .before = everything()) %>%  # move it before all columns
   select(-temp_range_C)
-  
 glimpse(dat)
 
 
@@ -70,11 +68,12 @@ taxaDat <- dat %>%
                otherwise = NA_integer_)))  # Set to NA if unable to get AphiaID
 
     taxaDatID %>% 
-      summary() # ensure there are no NAs
+      summary() # ensure there are no NAs...
+      # There's one...
     
-    # Manually add Aphia ids for missing data
-    taxaDatID <- taxaDatID %>%
-      mutate(AphiaID = if_else(row_number() == 19, 1248, AphiaID))
+      # Manually add Aphia ids for missing data
+      taxaDatID <- taxaDatID %>%
+        mutate(AphiaID = if_else(row_number() == 19, 1248, AphiaID))
 
 
   # Add classifications using AphiaIDs
@@ -97,10 +96,65 @@ taxaDat <- dat %>%
 
 # Join taxa info back into Q10 data ----
 datClean <- dat %>% 
-  left_join(taxaDat, by = "taxa") %>% 
-  relocate(c(phylum, class, order, family, genus), .before = taxa)
-  glimpse(datClean)
+    left_join(taxaDat, by = "taxa") %>% 
+    relocate(c(phylum, class, order, family, genus), .before = taxa) %>% 
+    mutate(
+      # Create custom size groupings following Grigoratou et al. 2025 Figure 1
+      sizeGrp = case_when(
+        # Mesoplankton: 0.2 um - 20 mm
+        class == "Copepoda"       ~ "Mesoplankton",
+        phylum == "Rotifera"      ~ "Mesoplankton",
+        class == "Appendicularia" ~ "Mesoplankton", # grouped here because we only have O. dioica
+        phylum == "Mollusca"      ~ "Mesoplankton", # grouped here because they are larvae and/or Pteropods
+        # Macroplankton: 20 mm - 200 mm
+        phylum == "Chaetognatha"  ~ "Macroplankton",
+        phylum == "Cnidaria"      ~ "Macroplankton",
+        phylum == "Ctenophora"    ~ "Macroplankton",
+        class == "Malacostraca"   ~ "Macroplankton",
+        class == "Thaliacea"      ~ "Macroplankton",
+        .default = "OTHER"),
+      
+      # Create custom functional groups based on feeding modes
+      funcGrp = case_when(
+        # Crustaceans
+        class == "Malacostraca"   ~ "Crustaceans",
+        class == "Copepoda"       ~ "Crustaceans",
+        phylum == "Annelida"      ~ "Crustaceans",
+        phylum == "Rotifera"       ~ "Crustaceans",
+        # Gelatinous filter-feeders
+        class == "Thaliacea"      ~ "GelFilter",
+        class == "Appendicularia" ~ "GelFilter",
+        # Gelatinous predators
+        phylum == "Cnidaria"      ~ "GelPreds",
+        phylum == "Ctenophora"    ~ "GelPreds",
+        phylum == "Chaetognatha"  ~ "GelPreds", # grouped with GelPreds because  although not full-gelatinous, this makes more sense than crustaceans
+        phylum == "Mollusca"      ~ "GelPreds",
+        .default = "OTHER"),
+      
+      # Create custom groupings for general zoop groups following Ikeda 2014
+      zoopGrp = case_when( 
+        phylum == "Annelida"      ~ "Annelids",
+        phylum == "Chaetognatha"  ~ "Chaetognaths",
+        phylum == "Cnidaria"      ~ "Cnidarians",
+        phylum == "Ctenophora"    ~ "Ctenophores",
+        phylum == "Mollusca"      ~ "Molluscs",
+        phylum == "Rotifera"      ~ "Rotifers",
+        class == "Appendicularia" ~ "Appendicularians",
+        class == "Copepoda"       ~ "Copepods",
+        class == "Thaliacea"      ~ "Thaliaceans",
+        order == "Euphausiacea"   ~ "Euphausiids",
+        order == "Amphipoda"      ~ "Amphipods",
+        order == "Decapoda"       ~ "Decapods",
+        order == "Mysidacea"      ~ "Mysids",
+        .default = "OTHER"),
+    ) %>% 
+    relocate(zoopGrp, .before = phylum) %>% 
+    relocate(sizeGrp, .before = zoopGrp) %>% 
+    relocate(funcGrp, .before = sizeGrp)
   
+  glimpse(datClean)
+
+  # Pick up from here...
   
   # Count number of unique phylums
   datClean %>% 

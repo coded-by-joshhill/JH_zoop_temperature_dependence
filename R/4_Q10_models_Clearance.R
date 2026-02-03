@@ -62,20 +62,20 @@ usedat <- dat %>%
 
   
 # Custom grouping order 
-group_order <- c("Euphausiacea", "Copepoda", "Ctenophora", 
-                 "Cnidaria", "Thaliacea", "Appendicularia")
+group_order <- c("Euphausiids", "Copepods", "Ctenophores", 
+                 "Cnidarians", "Thaliaceans", "Appendicularians")
 
   
   
 # Convert temp to Kelvin and prep data for modelling ----
 mdat <- usedat %>% 
     filter( # exclude values that are not biologically reasonable or are extreme outliers
-      (zoopGrp == "Appendicularia" & Cspecific_rate < 15000) |
-      (zoopGrp == "Cnidaria"       & Cspecific_rate < 5000) |
-      (zoopGrp == "Copepoda"       & Cspecific_rate < 3000) |
-      (zoopGrp == "Ctenophora"     & Cspecific_rate < 10000) |
-      (zoopGrp == "Euphausiacea"   & Cspecific_rate < 50) |
-      (zoopGrp == "Thaliacea"      & Cspecific_rate < 5000)) %>%
+      (zoopGrp == "Appendicularians" & Cspecific_rate < 15000) |
+      (zoopGrp == "Cnidarians"       & Cspecific_rate < 5000) |
+      (zoopGrp == "Copepods"       & Cspecific_rate < 3000) |
+      (zoopGrp == "Ctenophores"     & Cspecific_rate < 10000) |
+      (zoopGrp == "Euphausiids"   & Cspecific_rate < 50) |
+      (zoopGrp == "Thaliaceans"      & Cspecific_rate < 5000)) %>%
     filter(!is.na(temp_C)) %>% 
     mutate(temp_K = temp_C + 273.15,
            x = 1/temp_K,
