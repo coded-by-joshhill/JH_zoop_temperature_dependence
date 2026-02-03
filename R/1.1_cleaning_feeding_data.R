@@ -132,20 +132,37 @@ datClean <- dat %>%
     ungroup() %>% 
     relocate(c(phylum, class, order, family, genus, species), .before = taxa) %>% 
     relocate(BMC_mg, .after = BM_C) %>% 
-    mutate(zoopGrp = case_when( # Create custom groupings following Ikeda2014
-      order == "Euphausiacea"   ~ "Euphausiacea",
-      order == "Amphipoda"      ~ "Amphipoda",
-      order == "Decapoda"       ~ "Decapoda",
-      order == "Mysida"         ~ "Mysida",
-      class == "Copepoda"       ~ "Copepoda",
-      phylum == "Mollusca"      ~ "Mollusca",
-      phylum == "Chaetognatha"  ~ "Chaetognatha",
-      phylum == "Cnidaria"      ~ "Cnidaria",
-      phylum == "Ctenophora"    ~ "Ctenophora",
-      class == "Thaliacea"      ~ "Thaliacea",
-      class == "Appendicularia" ~ "Appendicularia",
-      .default = "OTHER")) %>% 
-    relocate(zoopGrp, .before = phylum)
+    mutate(
+      # Create custom groupings for general zoop groups following Ikeda 2014
+      zoopGrp = case_when( 
+        order == "Euphausiacea"   ~ "Euphausiacea",
+        order == "Amphipoda"      ~ "Amphipoda",
+        order == "Decapoda"       ~ "Decapoda",
+        order == "Mysida"         ~ "Mysida",
+        class == "Copepoda"       ~ "Copepoda",
+        phylum == "Mollusca"      ~ "Mollusca",
+        phylum == "Chaetognatha"  ~ "Chaetognatha",
+        phylum == "Cnidaria"      ~ "Cnidaria",
+        phylum == "Ctenophora"    ~ "Ctenophora",
+        class == "Thaliacea"      ~ "Thaliacea",
+        class == "Appendicularia" ~ "Appendicularia",
+        .default = "OTHER"),
+
+      # Create custom size groupings following Grigoratou et al. 2025 Figure 1
+      sizeGrp = case_when(
+        # Mesoplankton: 0.2 um - 20 mm
+        class == "Copepoda"        ~ "Mesoplankton",
+        class == "Appendicularia"  ~ "Mesoplankton", # put under meso because we only have O. dioica
+        # Macroplankton: 20 mm - 200 mm
+        class == "Malacostraca"    ~ "Macroplankton",
+        class == "Scyphozoa"       ~ "Macroplankton",
+        class == "Hydrozoa"        ~ "Macroplankton",
+        class == "Tentaculata"     ~ "Macroplankton",
+        class == "Thaliacea"       ~ "Macroplankton",
+        class == "Sagittoidea"     ~ "Macroplankton",
+        .default = "OTHER")) %>% 
+    relocate(zoopGrp, .before = phylum) %>% 
+    relocate(sizeGrp, .before = zoopGrp)
 
   
   # Count unique ZoopGrps rates for ClearanceRate
