@@ -17,9 +17,9 @@ library(glmmTMB)
 # BODY MASS AS CARBON CALCULATOR
 # Estimate carbon weight using an allometric equation
 calc_BMC <- function(bodyLength_mm) {
-  # Following Jaspers et al. 2009, use the slope (2.455), intercept (-6.96), and trunk length (TL) to estimate carbon mass
-  # where, logC (ugC) = 2.455 log TL(um) -6.96.... located in Table 1 and Figure 2 - DOI: 10.1093/plankt/fbp002 
-  # therefore... C (ugC) = 10^-6.96 * (bodyLength (mm) * 1000) ^ 2.455
+  # Following Jaspers et al. 2009, use the slope (2.455 μgC um), intercept (-6.96 μgC), and trunk length (TL) to estimate carbon mass
+  # where, logC (μgC) = 2.455 log TL(μm) -6.96.... located in Table 1 and Figure 2 - DOI: 10.1093/plankt/fbp002 
+  # therefore... C (μgC) = 10^-6.96 * (bodyLength (mm) * 1000) ^ 2.455
   carbonMass_ugC = 10^(-6.96) * (bodyLength_mm * 1000) ^ 2.455
   
   return(carbonMass_ugC)
@@ -94,20 +94,20 @@ calcGrowthRate <- function(mass1, mass0, time) {
 
 
 # RESPIRATION CONVERTER ----
-# Convert respiration rates to ulO2/ind/hr
+# Convert respiration rates to μlO2/ind/hr
 convert_respiration <- function(rate, unit, genus) {
   if (is.na(rate) || is.na(unit)) return(list(rate = NA_real_, unit = NA_character_))
   
-  if (unit == "ulO2/ind/hr") return(list(rate = rate,                  unit = "ulO2/ind/hr")) # maintain ulO2/ind/hr
+  if (unit == "ulO2/ind/hr") return(list(rate = rate,                  unit = "ulO2/ind/hr")) # maintain μlO2/ind/hr
   if (unit == "ulO2/ind/day") return(list(rate = rate / 24,            unit = "ulO2/ind/hr")) # day to hr
-  if (unit == "ulO2/mgC/hr") return(list(rate = rate,                  unit = "ulO2/mgC/hr")) # maintain ulO2/mgC/hr
-  if (unit == "ulO2/ugC/day") return(list(rate = (rate / 1000) / 24,   unit = "ulO2/mgC/hr")) # ugC to mgC
-  if (unit == "umol/ind/hr") return(list(rate = rate * 22.4,           unit = "ulO2/ind/hr")) # umol to ulO2, as per the ideal gas law (i.e., 1 mol of gas = 22.4 L)
-  if (unit == "nlO2/ind/hr") return(list(rate = rate / 1000,           unit = "ulO2/ind/hr")) # nlO2 to ulO2
+  if (unit == "ulO2/mgC/hr") return(list(rate = rate,                  unit = "ulO2/mgC/hr")) # maintain μlO2/mgC/hr
+  if (unit == "ulO2/ugC/day") return(list(rate = (rate / 1000) / 24,   unit = "ulO2/mgC/hr")) # μgC to mgC
+  if (unit == "umol/ind/hr") return(list(rate = rate * 22.4,           unit = "ulO2/ind/hr")) # μmol to μlO2, as per the ideal gas law (i.e., 1 mol of gas = 22.4 L)
+  if (unit == "nlO2/ind/hr") return(list(rate = rate / 1000,           unit = "ulO2/ind/hr")) # nlO2 to μlO2
   
   # Stoichiometry
   if (genus == "Euphausia" & unit == "ugC/ind/day") 
-    return(list(rate = ((rate / 24) / (12.011 * 0.9)) * 22.4,         unit = "ulO2/ind/hr")) # ugC to ulO2, where 0.9 = RQ (Ross1982), day to hr
+    return(list(rate = ((rate / 24) / (12.011 * 0.9)) * 22.4,         unit = "ulO2/ind/hr")) # μgC to μlO2, where 0.9 = RQ (Ross1982), day to hr
   
   return(list(rate = NA_real_, unit = NA_character_))
 }
@@ -125,7 +125,8 @@ summarise_taxonomic_coverage <- function(data, dataset_name) {
       n_families = n_distinct(family, na.rm = TRUE),
       n_orders   = n_distinct(order, na.rm = TRUE),
       n_classes  = n_distinct(class, na.rm = TRUE),
-      n_phyla    = n_distinct(phylum, na.rm = TRUE),
+      n_phylas   = n_distinct(phylum, na.rm = TRUE),
+      n_zoopGrps = n_distinct(zoopGrp, na.rm = TRUE),
       n_observations = n()
     )
   return(coverage)

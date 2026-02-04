@@ -39,7 +39,7 @@ dat <- readRDS("Data/clear_ingest_data.rds")
 usedat <- dat %>% 
     filter(rate_name == "ClearanceRate") %>%
     group_by(zoopGrp) %>% 
-    filter(n() >= 20, # Exclude zoopGrps that don't have suitable data or temp ranges
+    filter(n() >= 15, # Exclude zoopGrps that don't have suitable data or temp ranges
            max(temp_C) - min(temp_C) >= 5) %>% 
     ungroup() %>% 
     select(primRef, zoopGrp, taxa, Cspecific_rate, final_unit, temp_C, BMC_mg) %>% 

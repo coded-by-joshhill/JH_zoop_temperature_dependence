@@ -7,6 +7,7 @@
   # Here I read in the data
   # Use worrms package to get AphiaID's and taxon classifications
   # Harmonise weight data to mg
+  # Assign unique groupings
   # Convert absolute rates to mass-specific
   # Save as an RDS file
 
@@ -14,6 +15,7 @@
 
 # Packages and helpers ----
 library(tidyverse)
+library(janitor)
 library(worrms)
 source("R/0_Helpers.R")
 
@@ -146,21 +148,23 @@ datClean <- dat %>%
         class == "Hydrozoa"       ~ "Macroplankton",
         class == "Malacostraca"   ~ "Macroplankton",
         class == "Thaliacea"      ~ "Macroplankton",
+        order == "Oegopsida"      ~ "Macroplankton", # an order of Cephalopod, not explicitly reported as larvae so grouped here
         .default = "OTHER"),
       
       # Create custom functional groups based on feeding modes
       funcGrp = case_when(
-        # Crustaceans
-        phylum == "Annelida"      ~ "Crustaceans",
-        class == "Copepoda"       ~ "Crustaceans",
-        class == "Malacostraca"   ~ "Crustaceans",
+        # Crustaceans and others
+        phylum == "Annelida"      ~ "CrustOthers",
+        phylum == "Chaetognatha"  ~ "CrustOthers", # grouped here because more functionally/taxonomically closer to a crustacean than a gelatinous predator
+        phylum == "Mollusca"      ~ "CrustOthers", # grouped here because more functionally/taxonomically closer to a crustacean than a gelatinous predator
+        class == "Copepoda"       ~ "CrustOthers",
+        class == "Malacostraca"   ~ "CrustOthers",
         # Gelatinous filter-feeders
         class == "Appendicularia" ~ "GelFilter",
         class == "Thaliacea"      ~ "GelFilter",
         # Gelatinous predators
         phylum == "Cnidaria"      ~ "GelPreds",
         phylum == "Ctenophora"    ~ "GelPreds",
-        phylum == "Chaetognatha"  ~ "GelPreds", # grouped with GelPreds because  although not full-gelatinous, this makes more sense than crustaceans
         .default = "OTHER"),
 
       # Create custom groupings for general zoop groups following Ikeda 2014
@@ -178,6 +182,7 @@ datClean <- dat %>%
         order == "Amphipoda"      ~ "Amphipods",
         order == "Decapoda"       ~ "Decapods",
         order == "Mysidacea"      ~ "Mysids",
+        order == "Mysida"         ~ "Mysids",
         .default = "OTHER"),
       ) %>% 
     relocate(zoopGrp, .before = phylum) %>% 
@@ -192,13 +197,36 @@ datClean <- dat %>%
     mutate(countZGrp = sum(zoopGrp > 1, na.rm = TRUE)) %>% 
     distinct(zoopGrp, countZGrp) %>% 
     arrange(countZGrp)
-    # 1 Chaetognaths             4
-    # 2 Ctenophores             58
-    # 3 Appendicularians        60
-    # 4 Euphausiids            201
-    # 5 Copepods               243
-    # 6 Thaliaceans            286
-    # 7 Cnidarians             334
+    # Chaetognaths             4
+    # Ctenophores             58
+    # Appendicularians        60
+    # Euphausiids            201
+    # Copepods               243
+    # Thaliaceans            286
+    # Cnidarians             334
+  
+  
+  # Count unique functional groups rates for ClearanceRate
+  datClean %>% 
+    filter(rate_name == "ClearanceRate") %>% 
+    group_by(funcGrp) %>% 
+    mutate(countFuncGrp = sum(funcGrp > 1, na.rm = TRUE)) %>% 
+    distinct(funcGrp, countFuncGrp) %>% 
+    arrange(countFuncGrp)
+    # GelFilter            346
+    # GelPreds             392
+    # CrustOthers          448
+  
+  
+  # Count unique size groups rates for ClearanceRate
+  datClean %>% 
+    filter(rate_name == "ClearanceRate") %>% 
+    group_by(sizeGrp) %>% 
+    mutate(countSizeGrp = sum(sizeGrp > 1, na.rm = TRUE)) %>% 
+    distinct(sizeGrp, countSizeGrp) %>% 
+    arrange(countSizeGrp)
+    # Mesoplankton           303
+    # Macroplankton          883
   
   
   # Check the temperature range for each zoopGrp
@@ -217,13 +245,36 @@ datClean <- dat %>%
     mutate(countZGrp = sum(zoopGrp > 1, na.rm = TRUE)) %>% 
     distinct(zoopGrp, countZGrp) %>% 
     arrange(countZGrp)
-    # 1 Appendicularians         6
-    # 2 Cnidarians               6
-    # 3 Ctenophores             35
-    # 4 Chaetognaths            79
-    # 5 Thaliaceans             81
-    # 6 Euphausiids             91
-    # 7 Copepods               173
+    # Appendicularians         6
+    # Cnidarians               6
+    # Ctenophores             35
+    # Chaetognaths            79
+    # Thaliaceans             81
+    # Euphausiids             91
+    # Copepods               173
+  
+  
+  # Count unique functional groups rates for IngestionRate
+  datClean %>% 
+    filter(rate_name == "IngestionRate") %>% 
+    group_by(funcGrp) %>% 
+    mutate(countFuncGrp = sum(funcGrp > 1, na.rm = TRUE)) %>% 
+    distinct(funcGrp, countFuncGrp) %>% 
+    arrange(countFuncGrp)
+    # GelPreds              41
+    # GelFilter             87
+    # CrustOthers          343
+  
+  
+  # Count unique size groups rates for IngestionRate
+  datClean %>% 
+    filter(rate_name == "IngestionRate") %>% 
+    group_by(sizeGrp) %>% 
+    mutate(countSizeGrp = sum(sizeGrp > 1, na.rm = TRUE)) %>% 
+    distinct(sizeGrp, countSizeGrp) %>% 
+    arrange(countSizeGrp)
+    # Mesoplankton           179
+    # Macroplankton          292
   
   
   # Check the temperature range for each zoopGrp

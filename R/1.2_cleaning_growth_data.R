@@ -4,9 +4,10 @@
 
 
 
-  # Here I read in the data to estimate growth, read in the compiled Pata and Hunt data,
+  # Here I read in the data
   # Use worrms package to get AphiaID's and taxon classifications
   # Harmonise weight data to mg
+  # Assign unique groupings
   # Convert absolute rates to mass-specific
   # Save as an RDS file
 
@@ -14,6 +15,7 @@
 
 # Packages and helpers ----
 library(tidyverse)
+library(janitor)
 library(worrms)
 source("R/0_Helpers.R")
 
@@ -145,44 +147,53 @@ datClean <- dat %>%
       # Create custom size groupings following Grigoratou et al. 2025 Figure 1
       sizeGrp = case_when(
         # Mesoplankton: 0.2 um - 20 mm
-        class == "Copepoda"       ~ "Mesoplankton",
         class == "Appendicularia"  ~ "Mesoplankton", # grouped here because we only have Oikopleura dioica
+        class == "Copepoda"        ~ "Mesoplankton",
+        order == "Pteropoda"       ~ "Mesoplankton", # grouped here because they are Pteropods
         # Macroplankton: 20 mm - 200 mm
-        class == "Malacostraca"   ~ "Macroplankton",
+        phylum == "Annelida"      ~ "Macroplankton", # grouped here because Tomopteris carpenteri is a larger sp.
+        phylum == "Chaetognatha"  ~ "Macroplankton",
+        phylum == "Cnidaria"      ~ "Macroplankton",
+        phylum == "Ctenophora"    ~ "Macroplankton",
         class == "Hydrozoa"       ~ "Macroplankton",
-        class == "Scyphozoa"      ~ "Macroplankton",
-        class == "Tentaculata"    ~ "Macroplankton",
+        class == "Malacostraca"   ~ "Macroplankton",
         class == "Thaliacea"      ~ "Macroplankton",
-        class == "Sagittoidea"    ~ "Macroplankton",
+        order == "Oegopsida"      ~ "Macroplankton", # an order of Cephalopod, not explicitly reported as larvae so grouped here
         .default = "OTHER"),
       
       # Create custom functional groups based on feeding modes
       funcGrp = case_when(
-        # Crustaceans
-        class == "Malacostraca"   ~ "Crustaceans",
-        class == "Copepoda"       ~ "Crustaceans",
+        # Crustaceans and others
+        phylum == "Annelida"      ~ "CrustOthers",
+        phylum == "Chaetognatha"  ~ "CrustOthers", # grouped here because more functionally/taxonomically closer to a crustacean than a gelatinous predator
+        phylum == "Mollusca"      ~ "CrustOthers", # grouped here because more functionally/taxonomically closer to a crustacean than a gelatinous predator
+        class == "Copepoda"       ~ "CrustOthers",
+        class == "Malacostraca"   ~ "CrustOthers",
         # Gelatinous filter-feeders
-        class == "Thaliacea"      ~ "GelFilter",
         class == "Appendicularia" ~ "GelFilter",
+        class == "Thaliacea"      ~ "GelFilter",
         # Gelatinous predators
         phylum == "Cnidaria"      ~ "GelPreds",
         phylum == "Ctenophora"    ~ "GelPreds",
-        phylum == "Chaetognatha"  ~ "GelPreds", # grouped with GelPreds because  although not full-gelatinous, this makes more sense than crustaceans
+        
         .default = "OTHER"),
       
       # Create custom groupings for general zoop groups following Ikeda 2014
       zoopGrp = case_when( 
-        order == "Euphausiacea"   ~ "Euphausiacea",
-        order == "Amphipoda"      ~ "Amphipoda",
-        order == "Decapoda"       ~ "Decapoda",
-        order == "Mysida"         ~ "Mysida",
-        class == "Copepoda"       ~ "Copepoda",
-        phylum == "Mollusca"      ~ "Mollusca",
-        phylum == "Chaetognatha"  ~ "Chaetognatha",
-        phylum == "Cnidaria"      ~ "Cnidaria",
-        phylum == "Ctenophora"    ~ "Ctenophora",
-        class == "Thaliacea"      ~ "Thaliacea",
-        class == "Appendicularia" ~ "Appendicularia",
+        phylum == "Annelida"      ~ "Annelids",
+        phylum == "Chaetognatha"  ~ "Chaetognaths",
+        phylum == "Cnidaria"      ~ "Cnidarians",
+        phylum == "Ctenophora"    ~ "Ctenophores",
+        phylum == "Mollusca"      ~ "Molluscs",
+        phylum == "Rotifera"      ~ "Rotifers",
+        class == "Appendicularia" ~ "Appendicularians",
+        class == "Copepoda"       ~ "Copepods",
+        class == "Thaliacea"      ~ "Thaliaceans",
+        order == "Euphausiacea"   ~ "Euphausiids",
+        order == "Amphipoda"      ~ "Amphipods",
+        order == "Decapoda"       ~ "Decapods",
+        order == "Mysidacea"      ~ "Mysids",
+        order == "Mysida"         ~ "Mysids",
         .default = "OTHER"),
     ) %>% 
     relocate(zoopGrp, .before = phylum) %>% 
@@ -196,15 +207,36 @@ datClean <- dat %>%
     mutate(countZGrp = sum(zoopGrp > 1, na.rm = TRUE)) %>% 
     distinct(zoopGrp, countZGrp) %>% 
     arrange(countZGrp)
-      # Mysida                14
-      # Decapoda              28
-      # Chaetognatha          28
-      # Euphausiacea          34
-      # Thaliacea             34
-      # Amphipoda             63
-      # Cnidaria              68
-      # Ctenophora           132
-      # Copepoda             285
+    # Mysids              14
+    # Decapods            28
+    # Chaetognaths        28
+    # Euphausiids         34
+    # Thaliaceans         34
+    # Amphipods           63
+    # Cnidarians          68
+    # Ctenophores        132
+    # Copepods           285
+  
+  
+  # Count unique functional groups rates
+  datClean %>% 
+    group_by(funcGrp) %>% 
+    mutate(countFuncGrp = sum(funcGrp > 1, na.rm = TRUE)) %>% 
+    distinct(funcGrp, countFuncGrp) %>% 
+    arrange(countFuncGrp)
+    # GelFilter             34
+    # GelPreds             200
+    # CrustOthers          452
+  
+  
+  # Count unique size groups rates
+  datClean %>% 
+    group_by(sizeGrp) %>% 
+    mutate(countSizeGrp = sum(sizeGrp > 1, na.rm = TRUE)) %>% 
+    distinct(sizeGrp, countSizeGrp) %>% 
+    arrange(countSizeGrp)
+    # Mesoplankton           285
+    # Macroplankton          401
   
   
   # Check the temperature range for each zoopGrp
