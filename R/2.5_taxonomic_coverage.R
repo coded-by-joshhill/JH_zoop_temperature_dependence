@@ -34,7 +34,7 @@ Sgroup_order <- c("Mesoplankton", "Macroplankton")
 
 
 # Functional groups
-Fgroup_order <- c("CrustOthers", "GelPreds", "GelFilter")
+Fgroup_order <- c("Crustaceans", "GelPreds", "GelFilter")
 
 
 # Zooplankton groups - simple to complex taxonomy
@@ -69,16 +69,16 @@ taxonomic_coverage
 
 # Table S1
 # Dataset     n_species n_genera n_families n_orders n_classes n_phylas n_zoopGrps n_observations
-#  Clearance          74       38         28       12         8        5          7           1186
-#  Ingestion          58       29         22       10         7        5          7            471
-#  Growth             48       32         28       16         7        5          9            685
-#  Respiration       117       65         47       20        10        6         10           1036
+# Clearance          74       38         28       12         8        5          7           1186
+# Ingestion          58       29         22       10         7        5          7            471
+# Growth             48       32         28       16         7        5          9            685
+# Respiration       117       65         47       20        10        6         10           1036
 
 
 
 # Taxonomic composition by zoopGrp ----
-# Show the distribution of data across sizeGrps, funcGrps and zoopGrps for each rate process
-# Show the number of species per group
+# Here we show the distribution of data across sizeGrps, funcGrps and zoopGrps for each rate process...
+# and show the number of species per group
 
 ## SizeGroups ----
 clearance_by_Sgroup <- clearance %>%
@@ -111,6 +111,7 @@ respiration_by_Sgroup <- respiration %>%
             n_species = n_distinct(species),
             n_observations = n(),
             .groups = "drop") %>% 
+  filter(!sizeGrp == "OTHER") %>% # exclude unclassified zooplankton
   arrange(sizeGrp)
 
 
@@ -127,27 +128,24 @@ all_Sgroups <- bind_rows(clearance_by_Sgroup, ingestion_by_Sgroup, growth_by_Sgr
          sizeGrp = factor(sizeGrp, levels = Sgroup_order))  # use group order
 
 
-SgrpFreqPlot <- ggplot(all_Sgroups,
+SgrpFreqPlot <- ggplot(all_Sgroups, 
                        aes(x = fct_rev(sizeGrp), y = n_observations, fill = dataset)) +
   geom_col(position = position_dodge(width = .9, reverse = TRUE)) +
-  geom_text(
-    aes(label = n_species),
-    position = position_dodge(width = 0.9, reverse = TRUE),
-    hjust = -0.5, size = 3.5) +
+  # Add the number of species annotation
+  geom_text(aes(label = n_species),
+            position = position_dodge(width = 0.9, reverse = TRUE),
+            hjust = -0.5, size = 3.5) +
   scale_fill_manual(values = mycols) +
   scale_y_continuous(expand = expansion(mult = c(0, 0.10))) +
   coord_flip() +
-  labs(
-    x = expression(bold("Zooplankton size")),
-    y = expression(bold("Number of observations")),
-    fill = "Dataset") +
+  labs(x = expression(bold("Zooplankton size")),
+       y = expression(bold("Number of observations")),
+       fill = "Dataset") +
   theme_bw(base_size = 12) +
-  theme(
-    legend.position = "top",
-    legend.title = element_text(size = 12, face = "bold"),
-    panel.grid.major.y = element_blank()) +
-  # facet_wrap(~ dataset, nrow = 1) +
-  theme(strip.text = element_text(size = 12, face = "bold"))
+  theme(legend.position = "top",
+        legend.title = element_text(size = 12, face = "bold"),
+        panel.grid.major.y = element_blank(),
+        strip.text = element_text(size = 12, face = "bold"))
 
 SgrpFreqPlot
 
@@ -190,6 +188,7 @@ respiration_by_Fgroup <- respiration %>%
             n_species = n_distinct(species),
             n_observations = n(),
             .groups = "drop") %>% 
+  filter(!funcGrp == "OTHER") %>% # exclude unclassified zooplankton
   arrange(funcGrp)
 
 
@@ -228,9 +227,8 @@ FgrpFreqPlot <- ggplot(all_Fgroups,
   theme(
     legend.position = "top",
     legend.title = element_text(size = 12, face = "bold"),
-    panel.grid.major.y = element_blank()) +
-  # facet_wrap(~ dataset, nrow = 1) +
-  theme(strip.text = element_text(size = 12, face = "bold"))
+    panel.grid.major.y = element_blank(),
+    strip.text = element_text(size = 12, face = "bold"))
 
 FgrpFreqPlot
 
@@ -308,9 +306,9 @@ ZgrpFreqPlot <- ggplot(all_Zgroups,
   theme(
     legend.position = "top",
     legend.title = element_text(size = 12, face = "bold"),
-    panel.grid.major.y = element_blank()) +
-  facet_wrap(~ dataset, nrow = 1) +
-  theme(strip.text = element_text(size = 10, face = "bold"))
+    panel.grid.major.y = element_blank(),
+    strip.text = element_text(size = 10, face = "bold")) +
+  facet_wrap(~ dataset, nrow = 1)
 
 ZgrpFreqPlot
 
@@ -332,52 +330,11 @@ Fig1_combined <- SgrpFreqPlot_no_y + FgrpFreqPlot_no_y + ZgrpFreqPlot +
     ncol = 1,
     guides = "collect"
   ) &
-  theme(legend.position = "top")
+  theme(legend.position = "none")
 
 Fig1_combined
 
-ggsave("Output/Figure_1_FreqPlots.pdf", Fig1_combined, width = 180, height = 180, units = "mm", dpi = 300)
-
-
-
-
-
-
-
-respiration %>% 
-  mutate(zoopGrp = factor(zoopGrp, levels = Zgroup_order)) %>%   # use group order
-  ggplot(aes(x = log(Cspecific_rate), y = fct_rev(zoopGrp))) +
-  geom_density_ridges_gradient(
-    aes(fill = after_stat(x)), scale = 2) +
-  scale_fill_gradientn(
-    colours = c("#0D0887FF", "#CC4678FF", "#F0F921FF"),
-    name = "Mass-specific\nrespiration rate") +  # Change this
-  theme_bw() +
-  labs(title = "Respiration",
-       x = "ln mass-specific respiration rate",
-       y = "Zooplankton group")
-
-
-# Ridge plot examples
-respiration %>% 
-  mutate(zoopGrp = factor(zoopGrp, levels = Zgroup_order)) %>%   # use group order
-  group_by(zoopGrp) %>%
-  mutate(n_species = n_distinct(taxa),
-         species_category = cut(n_species, 
-                                breaks = c(0, 5, 15, 25, Inf), 
-                                labels = c("Low (1-5)", "Medium (6-15)", "High (16-25)", "Very high (25+)"))) %>%
-  ggplot(aes(x = log(Cspecific_rate), y = fct_rev(zoopGrp), fill = species_category)) +
-  geom_density_ridges(scale = 2, alpha = 0.7) +
-  scale_fill_manual(
-    values = c("#2166AC", "#92C5DE", "#F4A582", "#B2182B"),
-    name = "Number of\nspecies") +
-  theme_bw() +
-  labs(title = "Carbon-specific respiration rate across all temperatures",
-       x = "ln C-specific respiration rate",
-       y = "Zooplankton group")
-
-
-############# Review the below ###############
+ggsave("Output/Figure_1_FreqPlots.pdf", Fig1_combined, width = 180, height = 160, units = "mm", dpi = 300)
 
 
 

@@ -84,7 +84,7 @@ outline <- st_graticule(
 
 
 # Main map ----
-mainmap <- ggplot() +
+Fig1_map <- ggplot() +
   # Add graticlues
   geom_sf(data = graticule, colour = "lightgrey", linewidth = 0.2) + 
   # Add the world shapefile
@@ -105,6 +105,6 @@ mainmap <- ggplot() +
         plot.tag = element_text(size = 14, face = "bold")) +
   guides(fill = guide_legend(title = "Data type"),
          color = guide_legend(title = "Data type"))
-mainmap
-ggsave("Output/Figure_1_map.pdf", mainmap, width = 150, units = "mm", dpi = 300)
+Fig1_map
+# ggsave("Output/Figure_1_map.pdf", Fig1_map, width = 140, units = "mm", dpi = 300)
 
