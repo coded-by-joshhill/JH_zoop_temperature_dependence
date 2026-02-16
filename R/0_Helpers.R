@@ -138,7 +138,7 @@ summarise_taxonomic_coverage <- function(data, dataset_name) {
 
 
 
-# SINGLE MODEL THERMAL SENSITIVITY ANALYSER ----
+# THERMAL SENSITIVITY ANALYSER ----
 # Calculate Q10 with CI AND prediction ribbons for plotting
 analyse_thermal_sensitivity <- function(model, data,
                                         temp_col = "temp_K", # for Q10 calculation
@@ -146,15 +146,23 @@ analyse_thermal_sensitivity <- function(model, data,
                                         alpha = 0.05) # For 95% CI
 { 
   #### Calculate Q10 ----
+  # Define groups and only progress for 1 group at a time
+  grp <- unique(data$group)
+  stopifnot(length(grp) == 1)
+  
   # Number of observations
   n_obs <- nrow(data)
+  
+  # Get degrees of freedom from model
+  df_residual <- df.residual(model)
   
   # Define temperatures
   T1 <- min(data[[temp_col]], na.rm = TRUE) # Take the minimum temperature per group
   T2 <- T1 + 10 # Take minimum temp and add specified temperature (hardwired to 10 degC)
   
   # Create prediction data for just two temps
-  newdat <- data.frame(x = c(1 / T1, 1 / T2)) # A dataframe with JUST the predictor comprising the reciprocals of two temps
+  newdat <- data.frame(x = c(1 / T1, 1 / T2), # A dataframe with JUST the predictor comprising the reciprocals of two temps
+                       group = grp) 
   
   # Get predictions with std err
   fit <- predict(model, newdata = newdat, # Predict the responses (in ln space) for the two temps
@@ -175,7 +183,7 @@ analyse_thermal_sensitivity <- function(model, data,
   
   # CI on log scale then transform
   log_Q10 <- pred2 - pred1
-  crit <- qnorm(1 - alpha / 2)
+  crit <- qt(1 - alpha / 2, df = df_residual) 
   CI_lower_log <- log_Q10 - crit * se_diff
   CI_upper_log <- log_Q10 + crit * se_diff
   
@@ -190,12 +198,16 @@ analyse_thermal_sensitivity <- function(model, data,
     n_obs = n_obs
   )
   
-  #### Get prediction ribbon for plotting ----
+  #### Get confidence ribbon for plotting ----
   # Get predictions with standard errors for all temps in dataset
   preds_raw <- predict(model,
-                       newdata = data.frame(x = data[[x_col]]),
+                       newdata = data.frame(
+                         x = data[[x_col]],
+                         group = grp,
+                         primRef = NA,
+                         taxa = NA),
                        se.fit = TRUE,
-                       re.form = NA # Maintain population-level predictions (ie., ignore random effects)
+                       re.form = NA # ignore random effects)
   )
   
   # Create dataframe with predictions and CIs
@@ -221,6 +233,39 @@ analyse_thermal_sensitivity <- function(model, data,
 
 
 
+# ALL ZOOP ARRHENIUS PLOT FUNCTION ----
+arrhenius_plot <- function(arrhenius_obj,
+                           x_limits = NULL) {
 
+  # Create Arrhenius plot (in log space because our rates vary in orders of magnitude)
+  p <- ggplot() +
+    # raw points 
+    geom_point(data = arrhenius_obj$all_data, 
+               aes(x = x, y = log(Cspecific_rate)), 
+               alpha = 0.3, size = 1) +
+    # prediction ribbon
+    geom_ribbon(data = arrhenius_obj$all_pred,
+                aes(x = x, ymin = conf.low_log, ymax = conf.high_log),
+                fill = "lightgrey", alpha = 0.3) +
+    # predicted line
+    geom_line(data = arrhenius_obj$all_pred, 
+              aes(x = x, y = predicted_log), 
+              colour = "darkblue", linewidth = 1, linetype = "dashed") +
+    # reverse x-axis for Arrhenius
+    scale_x_continuous(name = expression(bold("1 / Temp (K"^-1*")")),
+                       trans = "reverse",
+                       sec.axis = sec_axis(~1/. - 273.15, name = "Temp (°C)")) +
+    coord_cartesian(xlim = c(0.0037, 0.0033)) +
+    theme_bw() +
+    theme(axis.title.x = element_text(size = 11),
+          axis.title.y = element_text(size = 12),
+          axis.title.x.top = element_text(size = 11, face = "bold"),
+          axis.text = element_text(size = 11),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          plot.margin = margin(t = 5, r = 15, b = 5, l = 5))
+  
+  return(p)
 
-
+}
+# END OF ARRHENIUS PLOT FUNCTION

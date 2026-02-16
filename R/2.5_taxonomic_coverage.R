@@ -157,6 +157,8 @@ ggsave("Output/Figure_1_sizeGrps.pdf", SgrpFreqPlot, width = 160, height = 80, u
 ## FuncGroups ----
 clearance_by_Fgroup <- clearance %>%
   group_by(funcGrp) %>% 
+  filter(n() >= 15, # Exclude funcGrp that don't have suitable data or temp ranges
+         max(temp_C) - min(temp_C) >= 5) %>%
   summarise(dataset = "Clearance",
             n_species = n_distinct(species),
             n_observations = n(),
@@ -166,6 +168,8 @@ clearance_by_Fgroup <- clearance %>%
 
 ingestion_by_Fgroup <- ingestion %>%
   group_by(funcGrp) %>% 
+  filter(n() >= 15, # Exclude funcGrp that don't have suitable data or temp ranges
+         max(temp_C) - min(temp_C) >= 5) %>%
   summarise(dataset = "Ingestion",
             n_species = n_distinct(species),
             n_observations = n(),
@@ -175,6 +179,8 @@ ingestion_by_Fgroup <- ingestion %>%
 
 growth_by_Fgroup <- growth %>%
   group_by(funcGrp) %>% 
+  filter(n() >= 15, # Exclude funcGrp that don't have suitable data or temp ranges
+         max(temp_C) - min(temp_C) >= 5) %>%
   summarise(dataset = "Growth",
             n_species = n_distinct(species),
             n_observations = n(),
@@ -184,6 +190,8 @@ growth_by_Fgroup <- growth %>%
 
 respiration_by_Fgroup <- respiration %>%
   group_by(funcGrp) %>% 
+  filter(n() >= 15, # Exclude funcGrp that don't have suitable data or temp ranges
+         max(temp_C) - min(temp_C) >= 5) %>%
   summarise(dataset = "Respiration",
             n_species = n_distinct(species),
             n_observations = n(),
@@ -240,6 +248,8 @@ ggsave("Output/Figure_1_funcGrps.pdf", FgrpFreqPlot, width = 160, height = 80, u
 ## ZoopGroups (major taxonomic groups) ----
 clearance_by_Zgroup <- clearance %>%
   group_by(zoopGrp) %>% 
+  filter(n() >= 15, # Exclude zoopGrps that don't have suitable data or temp ranges
+         max(temp_C) - min(temp_C) >= 5) %>%
   summarise(dataset = "Clearance",
             n_species = n_distinct(species),
             n_observations = n(),
@@ -249,6 +259,8 @@ clearance_by_Zgroup <- clearance %>%
 
 ingestion_by_Zgroup <- ingestion %>%
   group_by(zoopGrp) %>% 
+  filter(n() >= 15, # Exclude zoopGrps that don't have suitable data or temp ranges
+         max(temp_C) - min(temp_C) >= 5) %>%
   summarise(dataset = "Ingestion",
             n_species = n_distinct(species),
             n_observations = n(),
@@ -258,6 +270,8 @@ ingestion_by_Zgroup <- ingestion %>%
 
 growth_by_Zgroup <- growth %>%
   group_by(zoopGrp) %>% 
+  filter(n() >= 15, # Exclude zoopGrps that don't have suitable data or temp ranges
+         max(temp_C) - min(temp_C) >= 5) %>%
   summarise(dataset = "Growth",
             n_species = n_distinct(species),
             n_observations = n(),
@@ -267,6 +281,8 @@ growth_by_Zgroup <- growth %>%
 
 respiration_by_Zgroup <- respiration %>%
   group_by(zoopGrp) %>% 
+  filter(n() >= 15, # Exclude zoopGrps that don't have suitable data or temp ranges
+         max(temp_C) - min(temp_C) >= 5) %>%
   summarise(dataset = "Respiration",
             n_species = n_distinct(species),
             n_observations = n(),
@@ -370,7 +386,7 @@ tempDat_binded %>%
 # Quick function to select data across each dataset
 food_dat_summary <- function(data, dataset_name) {
   data %>%
-    select(ref_no, food_type, food_conc, method) %>%
+    select(ref_no, food_type, food_conc, method, locality) %>%
     mutate(Dataset = dataset_name)
 }
 
@@ -383,10 +399,39 @@ foodDat_binded <- bind_rows(
   food_dat_summary(ingestion, "ingestion"))
 
 
+# Table S1 ----
 # Summarise the experiment method data and calculate the proportions reported and not reported.
 foodDat_binded %>% 
   mutate(method = if_else(is.na(method), "Not reported", method)) %>%
-  group_by(Dataset, method) %>%
+  group_by(method) %>%
+  mutate(method = recode(method,
+                    "NA"                   = "Not reported",
+                    "Bottle incubation"              = "Controlled experiment",
+                    "In situ bottle incubation"      = "In situ experiment",
+                    "Meta-analysis"                  = "Not reported",
+                    "Meta analysis"                  = "Not reported",
+                    "Oxygen respirometry"            = "Controlled experiment",
+                    "Water bottle method"            = "Controlled experiment",
+                    "Water bottle"                   = "Controlled experiment",
+                    "Observation chamber"            = "Controlled experiment",
+                    "Plankton kreisel tank"          = "Controlled experiment",
+                    "Mixed diet feeding experiments" = "Controlled experiment",
+                    "Sealed-chamber"                 = "Controlled experiment",
+                    "Respirometer chamber"           = "Controlled experiment",
+                    "Through-flow system"            = "Controlled experiment",
+                    "Feeding tank"                   = "Controlled experiment"
+    )
+  ) %>% 
   summarise(n = n(), .groups = "drop") %>%
-  group_by(Dataset) %>%
-  mutate(prop_method = n / sum(n) * 100)
+  mutate(prop_method = n / sum(n) * 100) %>% 
+  arrange(-prop_method) %>% 
+  print(n = "Inf")
+      # Table S1 - Proportion of methods used for original data collection
+      # method                    n         prop_method
+      # 1 Not reported         1915       56.7 
+      # 2 Controlled experiment  1311       38.8 
+      # 3 In situ experiment     152        4.50
+
+
+
+
