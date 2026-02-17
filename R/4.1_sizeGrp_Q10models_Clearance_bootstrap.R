@@ -16,7 +16,7 @@
 # Packages and helpers ----
 library(tidyverse)
 library(parallel)
-source("R/0.1_sizeGrp_Helpers.R") # use the sizeGrp helpers functions
+source("R/0.1_sizeGrp_bootstrap_Helpers.R") # use the sizeGrp helpers functions
 
 
 
@@ -80,101 +80,48 @@ mdat <- usedat %>%
 mdat %>% 
   ggplot() +
   geom_point(aes(x = x, y = y, colour = group)) +
+  facet_wrap(~sizeGrp, scales = "free") + 
   theme_bw()
 
 
 
-# Fit the model ----
-m1 <- glmmTMB(y ~ x + group + (1|primRef) + (1|taxa),  data = mdat) # fit the model
+# Fit the bootstrap models using parallel processing ----
+
+# Check no. cores
+detectCores()
+ncores <- detectCores() - 2
+
+# Specify cores for parallel processing
+mirai::daemons(ncores)
+
+# Using glmmTMB fit (y ~ x * sizeGrp + (1|primRef) + (1|taxa))...this can take some time...
+boot_models <- map(1:9999, in_parallel(\(x) boot_Q10(mdat),
+                                      # Specify locally-defined functions
+                                      boot_Q10 = boot_Q10,
+                                      glmmTMB = glmmTMB,
+                                      mdat = mdat))
 
 
-  # Check diagnostics
-  sim <- simulateResiduals(m1)
-  plot(sim)
-  testOutliers(sim) 
-  summary(m1)
+# Get Q10 estimates from bootstrap models...this can take some time too...
+Q10_estimates <- boot_models |>
+  map_dfr(in_parallel(\(df) get_Q10s(df),
+                      # Specify locally-defined function
+                      get_Q10s = get_Q10s))
 
 
-  
-# Get Q10 estimates and variance ----
-# results <- analyse_thermal_sensitivity(m1, mdat)
-results <- mdat %>%
-  group_by(group) %>%
-  group_split() %>%
-  map(~analyse_thermal_sensitivity(m1, .x)) # Use purrr to map this across my groups
+  # Get confidence intervals
+  Q10pdat <- Q10_estimates %>%
+    group_by(Group) %>%
+    summarise(mean = mean(Q10, na.rm = TRUE),
+              lower_CI = quantile(Q10, 0.025),
+              upper_CI = quantile(Q10, 0.975)) %>%
+    ungroup()
 
-  
-# Build Q10 summary table with diagnostics
-Q10dat <- map(~names(results), function(g) {
-  df <- mdat %>% filter(group == g)
-  
-  data.frame(
-    group    = g,
-    n_obs    = nrow(df),                     # number of observations
-    temp_min = min(df$temp_C, na.rm = TRUE), # min temperature in group
-    temp_max = max(df$temp_C, na.rm = TRUE), # max temperature in group
-    Q10      = results[[g]]$Q10$Q10,
-    Q10lwr   = results[[g]]$Q10$CI_lower,
-    Q10upr   = results[[g]]$Q10$CI_upper
-  )
-}) %>% bind_rows() %>% 
-  mutate(group = factor(group))
-  
+# Tear down existing daemons
+mirai::daemons(0)
 
-# Build Q10 summary table with diagnostics
-Q10dat <- mdat %>% filter(group == g)
- data.frame(
-  groups   = g,
-  n_obs    = nrow(mdat),                     # number of observations
-  temp_min = min(mdat$temp_C, na.rm = TRUE), # min temperature in group
-  temp_max = max(mdat$temp_C, na.rm = TRUE), # max temperature in group
-  Q10      = results$Q10$Q10,                # Q10 estimate
-  Q10lwr   = results$Q10$CI_lower,           # Upper Q10
-  Q10upr   = results$Q10$CI_upper)           # Lower Q10
-
-# Show me the results
-Q10dat
-  
-  
-  
-  
-  # Fit the bootstrap models using parallel processing ----
-# 
-# # Check no. cores
-# detectCores()
-# ncores <- detectCores() - 2
-
-# # Specify cores for parallel processing
-# mirai::daemons(ncores)
-# 
-# # Using glmmTMB fit (y ~ x * sizeGrp + (1|primRef) + (1|taxa))...this can take some time...
-# boot_models <- map(1:9999, in_parallel(\(x) boot_Q10(mdat),
-#                                       # Specify locally-defined functions
-#                                       boot_Q10 = boot_Q10,
-#                                       glmmTMB = glmmTMB,
-#                                       mdat = mdat)) 
-# 
-# 
-# # Get Q10 estimates from bootstrap models...this can take some time too...
-# Q10_estimates <- boot_models |>
-#   map_dfr(in_parallel(\(df) get_Q10s(df), 
-#                       # Specify locally-defined function
-#                       get_Q10s = get_Q10s))
-# 
-# 
-#   # Get confidence intervals
-#   Q10pdat <- Q10_estimates %>% 
-#     group_by(Group) %>% 
-#     summarise(median = median(Q10, na.rm = TRUE),
-#               lower_CI = quantile(Q10, 0.025),
-#               upper_CI = quantile(Q10, 0.975)) %>% 
-#     ungroup()
-# 
-# # Tear down existing daemons
-# mirai::daemons(0)
-# 
-# Q10pdat
-# 
+Q10pdat
+#
 # # Save as RDS
 # # saveRDS(Q10_estimates, "Data/sizeGrp_Q10_estimates_clearance.rds") # estimates
 # # saveRDS(mdat, "Data/sizeGrp_clearance_mdat.rds") # save modelling dataframe for plotting
