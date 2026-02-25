@@ -126,36 +126,36 @@ Q10pdat
 # # saveRDS(Q10_estimates, "Data/sizeGrp_Q10_estimates_clearance.rds") # estimates
 # # saveRDS(mdat, "Data/sizeGrp_clearance_mdat.rds") # save modelling dataframe for plotting
 # # saveRDS(Q10pdat, "Data/sizeGrp_Q10_summary_clearance.rds") # save for median and confidence intervals
-# 
-# 
-# 
-# # Create Arrhenius plots data ----
-# # Extract coefficients from all bootstrap models
-# coefs_list <- map(boot_models, ~fixef(.x)$cond)
-# 
-# # Get all zooplankton groups
-# groups <- levels(mdat$sizeGrp)
-# 
-# # Extract results using get_results function
-# results <- get_results(mdat, groups, coefs_list, Q10pdat)
-# 
-# # Arrhenius object 
-# arrhenius_obj <- list(
-#   mdat    = mdat[, c("sizeGrp", "x", "Cspecific_rate")],
-#   results = results,
-#   group_order = group_order)
-# 
-# # Save object for plotting
-# # saveRDS(arrhenius_obj, "Data/sizeGrp_clearance_arrhenius_plot_data.rds")
-# 
-# # Generate the plot
-# clearance_plot <- arrhenius_plot(
-#   mdat = arrhenius_obj$mdat,
-#   rate_col = "Cspecific_rate",
-#   results = arrhenius_obj$results,
-#   group_order = arrhenius_obj$group_order,
-#   x_limits = c(0.0037, 0.0033)) +
-#   labs(y = expression(bold("Clearance rate (ml mgC"^-1*" h"^-1*")")))
-# 
-# clearance_plot
+
+
+
+# Create Arrhenius plots data ----
+# Extract coefficients from all bootstrap models
+coefs_list <- map(boot_models, ~fixef(.x)$cond)
+
+# Get all zooplankton groups
+groups <- levels(mdat$sizeGrp)
+
+# Extract results using get_results function
+results <- get_results(mdat, groups, coefs_list, Q10pdat)
+
+# Arrhenius object
+arrhenius_obj <- list(
+  mdat    = mdat[, c("sizeGrp", "x", "Cspecific_rate")],
+  results = results,
+  group_order = group_order)
+
+# Save object for plotting
+# saveRDS(arrhenius_obj, "Data/sizeGrp_clearance_arrhenius_plot_data.rds")
+
+# Generate the plot
+clearance_plot <- arrhenius_plot(
+  mdat = arrhenius_obj$mdat,
+  rate_col = "Cspecific_rate",
+  results = arrhenius_obj$results,
+  group_order = arrhenius_obj$group_order,
+  x_limits = c(0.0037, 0.0033)) +
+  labs(y = expression(bold("Clearance rate (ml mgC"^-1*" h"^-1*")")))
+
+clearance_plot
 

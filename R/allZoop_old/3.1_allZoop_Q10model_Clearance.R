@@ -74,7 +74,7 @@ mdat <- usedat %>%
     filter(!is.na(temp_C)) %>% 
     mutate(temp_K = temp_C + 273.15,
            x = 1/temp_K,
-           y = log(Cspecific_rate),
+           y = log(Cspecific_rate), # log transform mass-specific rate
            group = "Zooplankton") %>% 
     filter(is.finite(y))
 
