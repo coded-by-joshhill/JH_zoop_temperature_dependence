@@ -307,27 +307,31 @@ datFinal <- datClean %>%
     else {
       list(rate = NA_real_, unit = NA_character_)
       }),
-    rate_value_fin = .conv$rate, 
-    rate_unit_fin  = .conv$unit) %>%
+    rate_value_clean = .conv$rate, 
+    rate_unit_clean  = .conv$unit) %>%
   ungroup() %>%
       
   # Convert to mass-specific rates
   mutate(Cspecific_rate = case_when(
-    rate_name == "ClearanceRate" & rate_unit_fin == "ml/mgC/hr"                   ~ rate_value_fin,
-    rate_name == "ClearanceRate" & rate_unit_fin == "ml/ind/hr" & !is.na(BMC_mg)  ~ rate_value_fin / BMC_mg,
-    rate_name == "IngestionRate" & rate_unit_fin == "mgC/mgC/hr"                  ~ rate_value_fin,
-    rate_name == "IngestionRate" & rate_unit_fin == "mgC/ind/hr" & !is.na(BMC_mg) ~ rate_value_fin / BMC_mg,
+    # Clearance rate
+    rate_name == "ClearanceRate" & rate_unit_clean == "ml/mgC/hr"                   ~ rate_value_clean, # keep as is, already mass-specific
+    rate_name == "ClearanceRate" & rate_unit_clean == "ml/ind/hr" & !is.na(BMC_mg)  ~ rate_value_clean / BMC_mg, # convert to mass-specific
+    # Ingestion rate
+    rate_name == "IngestionRate" & rate_unit_clean == "mgC/mgC/hr"                  ~ rate_value_clean, # keep as is, already mass-specific
+    rate_name == "IngestionRate" & rate_unit_clean == "mgC/ind/hr" & !is.na(BMC_mg) ~ rate_value_clean / BMC_mg, # convert to mass-specific
     TRUE ~ NA_real_),
-    final_unit = case_when(
+    Cspecific_unit = case_when( # update the mass-specific units to match the mass-specific rates...
       rate_name == "ClearanceRate" & !is.na(Cspecific_rate) ~ "ml/mgC/hr",
       rate_name == "IngestionRate" & !is.na(Cspecific_rate) ~ "mgC/mgC/hr",
-      TRUE ~ rate_unit_fin),
+      TRUE ~ rate_unit_clean),
     sizeGrp = as.factor(sizeGrp),
     funcGrp = as.factor(funcGrp),  
     zoopGrp = as.factor(zoopGrp)) %>%
-  select(-.conv, -rate_value_fin, -rate_unit_fin) %>% 
+  select(-.conv) %>% 
   relocate(Cspecific_rate, .after = rate_name) %>% 
-  relocate(final_unit, .after = Cspecific_rate)
+  relocate(Cspecific_unit, .after = Cspecific_rate) %>% 
+  relocate(rate_value_clean, .after = Cspecific_unit) %>% 
+  relocate(rate_unit_clean, .after = rate_value_clean)
 glimpse(datFinal)
 
 # End conversion

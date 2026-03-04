@@ -255,11 +255,16 @@ datClean <- dat %>%
 # Prep data for analysis ----
 datFinal <- datClean %>%
   # No need to harmoise this data (unless more is added)... so I'll use a simple mutate to maintain naming convention consistency
-  mutate(Cspecific_rate = rate_value,
-         final_unit = rate_unit,
-         zoopGrp = as.factor(zoopGrp)) %>%
+  mutate(Cspecific_rate = rate_value, # rate_value is already mass-specific so merge to consistent naming convention
+         Cspecific_unit = rate_unit, # update the units
+         zoopGrp = as.factor(zoopGrp),
+         # Because I have some carbon mass values, we will also calculate absolute growth rates
+         rate_value_clean = Cspecific_rate * BMC_mg, # calculate absolute growth rate using available body mass carbon data
+         rate_unit_clean = "mgC/ind/hr") %>% # update the unit to match
   relocate(Cspecific_rate, .after = rate_name) %>% 
-  relocate(final_unit, .after = Cspecific_rate) %>% 
+  relocate(Cspecific_unit, .after = Cspecific_rate) %>%
+  relocate(rate_value_clean, .after = Cspecific_unit) %>% 
+  relocate(rate_unit_clean, .after = rate_value_clean) %>% 
   filter(ref_no != "Pata_excl_1460") # remove this huge outlier by Kasuya2002
 glimpse(datFinal)
 
@@ -270,7 +275,14 @@ glimpse(datFinal)
 datFinal %>% 
   ggplot() + 
   geom_point(aes(x = temp_C, 
-                 y = log(Cspecific_rate), 
+                 y = log(Cspecific_rate), # mass-specific
+                 colour = sizeGrp))
+
+# sizeGrp
+datFinal %>% 
+  ggplot() + 
+  geom_point(aes(x = temp_C, 
+                 y = log(rate_value_clean), # absolute
                  colour = sizeGrp))
 
 

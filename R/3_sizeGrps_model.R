@@ -19,6 +19,7 @@ library(glmmTMB) # for modelling
 library(DHARMa) # for diagnostics
 library(MuMIn) # for Rsqr
 library(emmeans) # Estimated marginal means
+library(performance)
 theme_set(new = theme_bw())
 
 
@@ -32,7 +33,7 @@ dat <- readRDS("Data/clear_ingest_data.rds")
 # Clearance data
 cleardat <- dat %>% 
   filter(rate_name == "ClearanceRate") %>% # Filter for clearance rate
-  select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, final_unit, temp_C, BMC_mg) %>% 
+  select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Clearance"))
 
@@ -40,21 +41,21 @@ cleardat <- dat %>%
 # Ingestion data
 ingdat <- dat %>% 
   filter(rate_name == "IngestionRate") %>% # Filter for clearance rate
-  select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, final_unit, temp_C, BMC_mg) %>% 
+  select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Ingestion"))
 
 
 # Growth data
 grwdat <- readRDS("Data/grwth_dat.rds") %>% 
-  select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, final_unit, temp_C, BMC_mg) %>% 
+  select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Growth"))
 
 
 # Respiration data
 respdat <- readRDS("Data/resp_dat.rds") %>% 
-  select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, final_unit, temp_C, BMC_mg) %>% 
+  select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Respiration"))
 
@@ -202,6 +203,8 @@ m3 <- glmmTMB(ln_Cspecific_rate ~
   r.squaredGLMM(m3)
 
 
+performance::compare_performance(m1, m2, m3)
+
 
 # Likelihood ratios test of the models
 anova(m1, m2, m3)
@@ -322,8 +325,9 @@ PlotLMM = function(model){
 
 # Plot it
 tempPlot <- PlotLMM(m1)
-tempPlot
-  
+tempPlot +
+  ggtitle("GLMM: log(massSpecificRates) ~ temp * rate * sizeGrps")
+
   
 # Extract slopes using and calculate Q10 for each sizeGrp
 sizeGrp_slopes <- emtrends(m1, ~ rate_name * sizeGrp, var = "temp_C")

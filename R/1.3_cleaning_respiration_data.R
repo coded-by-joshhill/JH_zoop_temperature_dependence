@@ -220,23 +220,24 @@ datFinal <- datClean %>%
     else {
       list(rate = NA_real_, unit = NA_character_)
       }),
-    rate_value_fin = .conv$rate, 
-    rate_unit_fin  = .conv$unit) %>%
+    rate_value_clean = .conv$rate, 
+    rate_unit_clean  = .conv$unit) %>%
   ungroup() %>%
-      
       
   # Convert to mass-specific rates
   mutate(Cspecific_rate = case_when(
-    rate_name == "RespirationRate" & rate_unit_fin == "ulO2/mgC/hr"                   ~ rate_value_fin,
-    rate_name == "RespirationRate" & rate_unit_fin == "ulO2/ind/hr" & !is.na(BMC_mg)  ~ rate_value_fin / BMC_mg,
+    rate_name == "RespirationRate" & rate_unit_clean == "ulO2/mgC/hr"                   ~ rate_value_clean, # keep as is, already mass-specific
+    rate_name == "RespirationRate" & rate_unit_clean == "ulO2/ind/hr" & !is.na(BMC_mg)  ~ rate_value_clean / BMC_mg, # convert to mass-specific
     TRUE ~ NA_real_),
-    final_unit = case_when(
-      rate_name == "RespirationRate" & !is.na(Cspecific_rate) ~ "ulO2/mgC/hr",
-      TRUE ~ rate_unit_fin),
+    Cspecific_unit = case_when(
+      rate_name == "RespirationRate" & !is.na(Cspecific_rate) ~ "ulO2/mgC/hr", # update mass-specific units to match the rates...
+      TRUE ~ rate_unit_clean),
     zoopGrp = as.factor(zoopGrp)) %>%
-  select(-.conv, -rate_value_fin, -rate_unit_fin) %>%
+  select(-.conv) %>%
   relocate(Cspecific_rate, .after = rate_name) %>% 
-  relocate(final_unit, .after = Cspecific_rate)
+  relocate(Cspecific_unit, .after = Cspecific_rate) %>% 
+  relocate(rate_value_clean, .after = Cspecific_unit) %>% 
+  relocate(rate_unit_clean, .after = rate_value_clean)
 glimpse(datFinal)
 
 # End conversion
@@ -246,7 +247,15 @@ glimpse(datFinal)
 datFinal %>% 
   ggplot() + 
   geom_point(aes(x = temp_C, 
-                 y = log(Cspecific_rate), 
+                 y = log(Cspecific_rate), # mass-specific
+                 colour = sizeGrp))
+
+# sizeGrp
+datFinal %>% 
+  filter(rate_unit_clean == "ulO2/ind/hr") %>% 
+  ggplot() + 
+  geom_point(aes(x = temp_C, 
+                 y = log(rate_value_clean), # absolute
                  colour = sizeGrp))
 
 
@@ -254,7 +263,15 @@ datFinal %>%
 datFinal %>% 
   ggplot() + 
   geom_point(aes(x = temp_C, 
-                 y = log(Cspecific_rate), 
+                 y = log(Cspecific_rate), # mass-specific
+                 colour = funcGrp))
+
+# funcGrp
+datFinal %>% 
+  filter(rate_unit_clean == "ulO2/ind/hr") %>% 
+  ggplot() + 
+  geom_point(aes(x = temp_C, 
+                 y = log(rate_value_clean), # absolute
                  colour = funcGrp))
 
 
@@ -262,7 +279,15 @@ datFinal %>%
 datFinal %>% 
   ggplot() + 
   geom_point(aes(x = temp_C, 
-                 y = log(Cspecific_rate), 
+                 y = log(Cspecific_rate), # mass-specific
+                 colour = zoopGrp))
+
+# funcGrp
+datFinal %>% 
+  filter(rate_unit_clean == "ulO2/ind/hr") %>% 
+  ggplot() + 
+  geom_point(aes(x = temp_C, 
+                 y = log(rate_value_clean), # absolute
                  colour = zoopGrp))
 
 # Save as RDS for later use
