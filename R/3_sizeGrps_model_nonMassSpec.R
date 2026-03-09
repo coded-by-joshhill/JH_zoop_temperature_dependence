@@ -8,9 +8,8 @@
   # Combine data and subset by sizeGrp
   # Fit glmm with random effects to test if the effect of temp on biological rate process
   # Calculate Q10s from the model slopes
-  # Save the Q10 and variance into a dataframe
-  # Save Arrhenius plot object for later plotting
 
+# Note: we won't be progressing with this approach because most meta-analyses use mass-specific rates. We also aren't able to account for the effect of temperature on size and it's not as good including weight as a covaraite in a model
 
 
 # Packages and helpers ----
