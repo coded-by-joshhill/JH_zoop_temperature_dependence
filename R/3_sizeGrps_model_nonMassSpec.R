@@ -181,7 +181,7 @@ m2 <- glmmTMB(ln_rate_value_clean ~
                 temp_C * rate_name + # interactions between temp and different rates across all zooplankton
                 temp_C * sizeGrp +  # between temp and different sizeGrps for all rates
                 rate_name * sizeGrp + # between rates and sizeGrp 
-                (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
+                (temp_C | primRef) + (1 | taxa), # with primRef and taxa as random intercepts and slopes
               data = mdat) 
 
   # Check diagnostics
@@ -218,7 +218,7 @@ anova(m1, m2, m3)
 # AIC is also slightly better despite the BIC being slightly higher
 # I will use m1 on the basis of the chisqr test and AIC...
 
-summary(m2)
+summary(m1)
   
 
 

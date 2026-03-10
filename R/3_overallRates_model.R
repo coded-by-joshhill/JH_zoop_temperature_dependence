@@ -1,11 +1,11 @@
-# Calculating funcGrps Q10s
+# Calculating overall rate Q10s
 # Josh Hill
 # 25/02/2026
 
 
 
   # Here I read in all cleaned data
-  # Combine data and subset by funcGrp
+  # Combine data
   # Fit glmm with random effects to test if the effect of temp on biological rate process
   # Calculate Q10s from the model slopes
 
@@ -58,25 +58,16 @@ respdat <- readRDS("Data/resp_dat.rds") %>%
   mutate(rate_name = factor("Respiration"))
 
 
-# Custom grouping order
-group_order <- c("Crustaceans", 
-                 "GelPreds", 
-                 "GelFilter")
-
-
 # Combine them into one dataframe
-usedat <- rbind(cleardat, ingdat, grwdat, respdat) %>% 
-  filter_out(funcGrp == "OTHER" | is.na(temp_C)) %>%  # filter out the size group "OTHER" and remove any NAs in temp_C
-  mutate(funcGrp = fct_relevel(funcGrp, group_order)) # reorder funcGrp
-  
+usedat <- rbind(cleardat, ingdat, grwdat, respdat)
+
 
 # Check the temperature range
 usedat %>% 
-  group_by(funcGrp, rate_name) %>% 
   select(temp_C) %>% 
   summarise( 
-    temp_range = paste0(min(temp_C), "-", max(temp_C))) %>% 
-  arrange(rate_name, funcGrp)
+    temp_range = paste0(min(temp_C), "-", max(temp_C)))
+    # -1.8-31 degC
 
 
 # Quickly view distribution of raw Cspecific_rates
@@ -122,22 +113,18 @@ usedat %>%
 mdat <- usedat %>% 
   # exclude values that are not biologically reasonable or are extreme outliers
   filter(
-      (rate_name == "Clearance" & Cspecific_rate < 15000) |
+    (rate_name == "Clearance" & Cspecific_rate < 15000) |
       (rate_name == "Ingestion" & Cspecific_rate < 0.15) |
       (rate_name == "Growth" & Cspecific_rate < 0.075) |
       (rate_name == "Respiration" & Cspecific_rate < 60)
   ) %>%
-  group_by(funcGrp) %>% 
-  filter(n() >= 15, # Exclude zoopGrps that don't have suitable data or temp ranges
-         max(temp_C) - min(temp_C) >= 5) %>% 
-  ungroup() %>% 
   mutate(ln_Cspecific_rate = log(Cspecific_rate)) # log transform mass-specific rate
 
 
 # Quick look
 mdat %>% 
   ggplot() +
-  geom_point(aes(x = temp_C, y = ln_Cspecific_rate, , colour = funcGrp)) +
+  geom_point(aes(x = temp_C, y = ln_Cspecific_rate)) +
   facet_wrap(~ rate_name, scale = "free") +
   theme_bw()
   # Looks pretty tidy. Some clear relationships here
@@ -146,24 +133,14 @@ summary(mdat)
 
 
 # My main question here is...
-  # How does temperature dependence vary across zooplankton groups for each rate? AND
-  # How does temperature dependence vary across rate processes?
-
-  # So... I will need to model the logMassSpecificRates as a function of 
-    # temperature, the rate and the groups...
-    # I will need a complex model with interactions to test the difference between the effect of temp on rates and temp on groups.
-
-# My response is log transformed, continuous data and 2 rates are normally distributed and two are slightly left skewed... 
-  # This should be fine to Gaussian but I could also check a Gamma with link = log family on the normal massSpecRate data
-
-# I am also mainly interested in the interactions between at least temp:rate and temp:group
+  # How does temperature dependence vary across each rate for all zooplankton?
 
 
 
 # Fit the models ----
 
-# A complex model with 3 way interactions for temp, funcGrp and rate with random effects
-m1 <- glmmTMB(ln_Cspecific_rate ~ temp_C * rate_name * funcGrp + 
+# A complex model with 2 way interactions for temp and rate with random effects
+m1 <- glmmTMB(ln_Cspecific_rate ~ temp_C * rate_name + 
                 (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
               data = mdat) 
 
@@ -175,12 +152,10 @@ m1 <- glmmTMB(ln_Cspecific_rate ~ temp_C * rate_name * funcGrp +
   # Kind of difficult to interpret I'll fit a simpler model to tease this apart
 
   
-# A simpler model without the 3-way interactions, just 2-way interactions
+# A simpler model without interactions
 m2 <- glmmTMB(ln_Cspecific_rate ~ 
-                temp_C * rate_name + # interactions between temp and different rates across all zooplankton
-                temp_C * funcGrp +  # between temp and different funcGrps for all rates
-                rate_name * funcGrp + # between rates and funcGrp 
-                (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
+                temp_C + rate_name + 
+                (temp_C | primRef) + (1 | taxa), # with primRef and taxa as random intercepts and slopes
               data = mdat) 
 
   # Check diagnostics
@@ -188,16 +163,11 @@ m2 <- glmmTMB(ln_Cspecific_rate ~
   plot(sim) # Looks fine but seems less scattered compared to m1
   summary(m2)
   r.squaredGLMM(m2)
-  # temp:rate - looks like there is significantly different temp dependence among rates for all zoops
-  # rate:grp - appears to be no signif differences among rates and funcGrp but this doesn't include temperature in the interaction...
-  # my random effects seem to be soaking up a fairly decent amount of variance, though there is less for the slope compared to intercept
 
 
 # m1 but without random slopes, just intercepts
 m3 <- glmmTMB(ln_Cspecific_rate ~ 
                 temp_C * rate_name + # interactions between temp and different rates across all zooplankton
-                temp_C * funcGrp +  # between temp and different funcGrps for all rates
-                rate_name * funcGrp + # between rates and funcGrp 
                 (1 | primRef) + (1 | taxa), # with primRef and taxa as random intercepts
               data = mdat) 
 
@@ -213,21 +183,15 @@ performance::compare_performance(m1, m2, m3)
 
 # Likelihood ratios test of the models
 anova(m1, m2, m3)
-# likelihood ratios test shows m2 has significantly more explanatory power than both m1 and m3
+# likelihood ratios test shows m1 has significantly more explanatory power 
 # BIC is also slightly better
-# I will use m2 on the basis of the chisqr test and AIC...
+# I will use m1 on the basis of the chisqr test and AIC and BIC
 
-summary(m2)
+summary(m1)
 
 
 
 # Prep for plotting ----
-
-# Define group colours
-grp_cols <- c("Crustaceans" = "#d7191c",
-              "GelPreds" = "#fdae61",
-              "GelFilter" = "#2c7bb6")
-
 
 # Set min and max temp
 minTempC <- min(mdat$temp_C)
@@ -241,7 +205,6 @@ PlotLMM = function(model){
   # Build newdata grid manually
   newdat <- expand.grid(
     temp_C    = temp_seq,
-    funcGrp   = unique(mdat$funcGrp), # levels of funcGrp
     rate_name = unique(mdat$rate_name) # levels of rates
   )
   
@@ -257,15 +220,16 @@ PlotLMM = function(model){
 
     # Plot it up...
   ggplot() +
+    geom_point(data = mdat,
+               aes(x = temp_C, y = ln_Cspecific_rate), colour = "grey27",
+               alpha = 0.2) +
     geom_ribbon(data = pop_preds,
-                aes(x = temp_C, ymin = conf.low, ymax = conf.high, fill = funcGrp),
+                aes(x = temp_C, ymin = conf.low, ymax = conf.high), fill = "midnightblue",
                 alpha = 0.25) +
     geom_line(data = pop_preds,
-              aes(x = temp_C, y = estimate, colour = funcGrp),
+              aes(x = temp_C, y = estimate), colour = "midnightblue",
               linewidth = 1) +
-    geom_point(data = mdat,
-               aes(x = temp_C, y = ln_Cspecific_rate, colour = funcGrp),
-               alpha = 0.2) +
+
     facet_wrap(~rate_name, scales = "free",
                labeller = as_labeller(c(
                  "Clearance"   = "bold(Maximum~clearance~rate~(ml~mgC^-1~h^-1))",
@@ -275,12 +239,8 @@ PlotLMM = function(model){
                ), 
                label_parsed))+ 
     coord_cartesian(xlim = c(-2, 32)) +
-    scale_fill_manual(values = grp_cols, labels = c("Crustaceans" , "Gelatinious predators", "Gelatinious filter-feeders")) +
-    scale_colour_manual(values = grp_cols, labels = c("Crustaceans" , "Gelatinious predators", "Gelatinious filter-feeders")) +
     labs(x = "Temp (°C)",
-         y = "ln(Carbon-mass specific rate)",
-         fill = "Functional group",
-         colour = "Functional group") +
+         y = "ln(Carbon-mass specific rate)") +
     theme_bw() +
     theme(
       strip.background = element_rect(fill = "whitesmoke", colour = "black"),
@@ -293,54 +253,49 @@ PlotLMM = function(model){
 
 
 # Plot it
-tempPlot <- PlotLMM(m2)
+tempPlot <- PlotLMM(m1)
 tempPlot
 
-  
-# Extract slopes using and calculate Q10 for each funcGrp
-funcGrp_slopes <- emtrends(m2, ~ rate_name * funcGrp, var = "temp_C")
 
-funcGrp_slopes_Q10 <- as.data.frame(funcGrp_slopes) %>% 
-  mutate(Q10 = exp(10 * temp_C.trend),
+# Generate Q10s for zooplankton in general ----
+# Extract slopes and calculate Q10 for overall zooplankton
+slopes <- emtrends(m1, ~ rate_name, var = "temp_C")
+
+slopes_Q10 <- as.data.frame(slopes) %>% 
+  mutate(Q10 = exp(10* temp_C.trend),
          Q10_lwr = exp(10 * asymp.LCL),
-         Q10_upr = exp(10 * asymp.UCL)) %>% 
-  arrange(rate_name)
-funcGrp_slopes_Q10
+         Q10_upr = exp(10 * asymp.UCL))
+slopes_Q10
 
 
+# Define color palette ----
+rate_cols <- c("Clearance"   = "#66c2a5",
+               "Ingestion"   = "#fc8d62",
+               "Growth"      = "#8da0cb",
+               "Respiration" = "#e78ac3")
 
-# Plot funcGrp Q10s
-funcGQ10plot <- ggplot() +
-  geom_errorbar(data = funcGrp_slopes_Q10, 
-                aes(x = funcGrp, ymin = Q10_lwr, ymax = Q10_upr, colour = funcGrp),
-                width = .05,
-                linewidth = 1) +
-  geom_point(data = funcGrp_slopes_Q10, aes(x = funcGrp, y = Q10),
-             size = 3,
-             colour = "black") +
-  facet_wrap(~rate_name, scales = "free",
-             labeller = as_labeller(c(
-               "Clearance"   = "bold(Maximum~clearance~rate~(ml~mgC^-1~h^-1))",
-               "Ingestion"   = "bold(Maximum~ingestion~rate~(mgC~mgC^-1~h^-1))",
-               "Growth"      = "bold(Growth~rate~(mgC~mgC^-1~h^-1))",
-               "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))"
-             ), 
-             label_parsed)) +
-  scale_colour_manual(values = grp_cols) +
-  labs(x = "Size group",
-       y = bquote(bold("Carbon-mass specific Q"[10])),
-       colour = "Size group") +
+
+# Plot allZoop Q10s
+allZoopQ10plot <- ggplot() +
+  geom_errorbar(data = slopes_Q10, 
+                aes(x = rate_name, ymin = Q10_lwr, ymax = Q10_upr), 
+                colour = "darkgray",
+                width = 0.05, linewidth = 1) +
+  geom_point(data = slopes_Q10, 
+             aes(x = rate_name, y = Q10, fill = rate_name),
+             size = 4, colour = "black", shape = 21) +
+  scale_fill_manual(values = rate_cols, guide = "none") +
+  labs(x = "Biological rate process",
+       y = bquote(bold("Carbon-mass specific Q"[10]))) +
   theme(
-    strip.background = element_rect(fill = "whitesmoke", colour = "black"),
     axis.title = element_text(size = 11, face = "bold"),
-    axis.text = element_text(size = 10),
-    legend.position = "none"
+    axis.text = element_text(size = 10)
   )
-funcGQ10plot
+
+allZoopQ10plot
+
 
 library(patchwork)
 
-tempPlot/funcGQ10plot +
-  plot_layout(guides = "collect") 
-
-
+tempPlot/allZoopQ10plot +
+  plot_layout(guides = "collect")

@@ -8,8 +8,6 @@
   # Combine data and subset by sizeGrp
   # Fit glmm with random effects to test if the effect of temp on biological rate process
   # Calculate Q10s from the model slopes
-  # Save the Q10 and variance into a dataframe
-  # Save Arrhenius plot object for later plotting
 
 
 
@@ -60,7 +58,7 @@ respdat <- readRDS("Data/resp_dat.rds") %>%
   mutate(rate_name = factor("Respiration"))
 
 
-# Custom grouping order # Custom grofactor()uping order 
+# Custom grouping order
 group_order <- c("Mesoplankton", "Macroplankton") # meso before macro because they're smaller
 
 
@@ -72,10 +70,12 @@ usedat <- rbind(cleardat, ingdat, grwdat, respdat) %>%
 
 # Check the temperature range
 usedat %>% 
+  group_by(sizeGrp, rate_name) %>% 
   select(temp_C) %>% 
   summarise( 
-    temp_range = paste0(min(temp_C), "-", max(temp_C)))
-    # -1.8-31 degC
+    temp_range = paste0(min(temp_C), "-", max(temp_C))) %>% 
+  arrange(rate_name, sizeGrp)
+  # looks good
 
 
 # Quickly view distribution of raw Cspecific_rates
@@ -126,6 +126,10 @@ mdat <- usedat %>%
       (rate_name == "Growth" & Cspecific_rate < 0.075) |
       (rate_name == "Respiration" & Cspecific_rate < 60)
   ) %>%
+  group_by(funcGrp) %>% 
+  filter(n() >= 15, # Exclude zoopGrps that don't have suitable data or temp ranges
+         max(temp_C) - min(temp_C) >= 5) %>% 
+  ungroup() %>% 
   mutate(ln_Cspecific_rate = log(Cspecific_rate)) # log transform mass-specific rate
 
 
@@ -208,59 +212,19 @@ performance::compare_performance(m1, m2, m3)
 
 # Likelihood ratios test of the models
 anova(m1, m2, m3)
-# likelihood ratios test shows m1 has significantly more explanatory power than both m2 and m3
-# AIC is also slightly better despite the BIC being slightly higher
-# I will use m1 on the basis of the chisqr test and AIC...
+# likelihood ratios test shows m2 has significantly more explanatory power than both m1 and m3
+# BIC is also slightly better
+# I will use m2 on the basis of the chisqr test and AIC...
 
-summary(m1)
-  # Family: gaussian  ( identity )
-  # Formula:          ln_Cspecific_rate ~ temp_C * rate_name * sizeGrp + (temp_C |      primRef) + (temp_C | taxa)
-  # Data: mdat
-  # 
-  # AIC       BIC    logLik -2*log(L)  df.resid 
-  # 7881.0    8020.3   -3917.5    7835.0      3131 
-  # 
-  # Random effects:
-  #   
-  # Conditional model:
-  #   Groups   Name        Variance  Std.Dev. Corr  
-  #   primRef  (Intercept) 1.2713938 1.12756        
-  #   temp_C      0.0017736 0.04211  -0.47 
-  #   taxa     (Intercept) 0.5433531 0.73712        
-  #   temp_C      0.0005054 0.02248  -0.86 
-  #   Residual             0.5699156 0.75493        
-  #  Number of obs: 3154, groups:  primRef, 151; taxa, 220
-  # 
-  # Dispersion estimate for gaussian family (sigma^2): 0.57 
-  # 
-  # Conditional model:
-  #   Estimate Std. Error z value Pr(>|z|)    
-  #   (Intercept)                                       3.905063   0.459163   8.505  < 2e-16 ***
-  #   temp_C                                            0.107480   0.026223   4.099 4.16e-05 ***
-  #   rate_nameIngestion                               -9.558626   0.482632 -19.805  < 2e-16 ***
-  #   rate_nameGrowth                                  -9.535298   0.583282 -16.348  < 2e-16 ***
-  #   rate_nameRespiration                             -3.358547   0.526216  -6.382 1.74e-10 ***
-  #   sizeGrpMacroplankton                             -1.280160   0.550483  -2.326  0.02004 *  
-  #   temp_C:rate_nameIngestion                         0.009251   0.027928   0.331  0.74046    
-  #   temp_C:rate_nameGrowth                           -0.139961   0.033256  -4.209 2.57e-05 ***
-  #   temp_C:rate_nameRespiration                      -0.006323   0.030730  -0.206  0.83696    
-  #   temp_C:sizeGrpMacroplankton                       0.065112   0.031244   2.084  0.03717 *  
-  #   rate_nameIngestion:sizeGrpMacroplankton           2.260457   0.542997   4.163 3.14e-05 ***
-  #   rate_nameGrowth:sizeGrpMacroplankton              0.627717   0.692364   0.907  0.36460    
-  #   rate_nameRespiration:sizeGrpMacroplankton         1.287128   0.564210   2.281  0.02253 *  
-  #   temp_C:rate_nameIngestion:sizeGrpMacroplankton   -0.130810   0.031807  -4.113 3.91e-05 ***
-  #   temp_C:rate_nameGrowth:sizeGrpMacroplankton      -0.038390   0.038863  -0.988  0.32324    
-  #   temp_C:rate_nameRespiration:sizeGrpMacroplankton -0.088665   0.032963  -2.690  0.00715 ** 
-  #   ---
-  #   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-  # 
-  # temp:rate:sizegrp - there is significantly different temp dependence among all rates and grps for: ingestion and respiration
-    # growth is not significantly different between meso and macroplankton but growth is significantly different to other rates...
+summary(m2)
 
 
 
 # Prep for plotting ----
+
+# Define group colours
+grp_cols <- c("Mesoplankton" = "#fc8d59",
+              "Macroplankton" = "#91bfdb")
 
 # Set min and max temp
 minTempC <- min(mdat$temp_C)
@@ -301,12 +265,14 @@ PlotLMM = function(model){
                alpha = 0.2) +
     facet_wrap(~rate_name, scales = "free",
                labeller = as_labeller(c(
-                 "Clearance"   = "bold(Clearance~rate~(ml~mgC^-1~h^-1))",
-                 "Ingestion"   = "bold(Ingestion~rate~(mgC~mgC^-1~h^-1))",
+                 "Clearance"   = "bold(Maximum~clearance~rate~(ml~mgC^-1~h^-1))",
+                 "Ingestion"   = "bold(Maximum~ingestion~rate~(mgC~mgC^-1~h^-1))",
                  "Growth"      = "bold(Growth~rate~(mgC~mgC^-1~h^-1))",
                  "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))"
                ), 
                label_parsed))+ 
+    scale_fill_manual(values = grp_cols, labels = c("Mesoplankton", "Macroplankton")) +
+    scale_colour_manual(values = grp_cols, labels = c("Mesoplankton", "Macroplankton")) +
     coord_cartesian(xlim = c(-2, 32)) +
     labs(x = "Temp (°C)",
          y = "ln(Carbon-mass specific rate)",
@@ -324,13 +290,12 @@ PlotLMM = function(model){
 
 
 # Plot it
-tempPlot <- PlotLMM(m1)
-tempPlot +
-  ggtitle("GLMM: log(massSpecificRates) ~ temp * rate * sizeGrps")
-
+tempPlot <- PlotLMM(m2)
+tempPlot
+summary(m2)
   
 # Extract slopes using and calculate Q10 for each sizeGrp
-sizeGrp_slopes <- emtrends(m1, ~ rate_name * sizeGrp, var = "temp_C")
+sizeGrp_slopes <- emtrends(m2, ~ rate_name * sizeGrp, var = "temp_C")
 
 sizeGrp_slopes_Q10 <- as.data.frame(sizeGrp_slopes) %>% 
   mutate(Q10 = exp(10 * temp_C.trend),
@@ -351,12 +316,13 @@ sizeGQ10plot <- ggplot() +
              colour = "black") +
   facet_wrap(~rate_name, scales = "free",
              labeller = as_labeller(c(
-               "Clearance"   = "bold(Clearance~rate~(ml~mgC^-1~h^-1))",
-               "Ingestion"   = "bold(Ingestion~rate~(mgC~mgC^-1~h^-1))",
+               "Clearance"   = "bold(Maximum~clearance~rate~(ml~mgC^-1~h^-1))",
+               "Ingestion"   = "bold(Maximum~ingestion~rate~(mgC~mgC^-1~h^-1))",
                "Growth"      = "bold(Growth~rate~(mgC~mgC^-1~h^-1))",
                "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))"
              ), 
              label_parsed))+  
+  scale_colour_manual(values = grp_cols, labels = c("Mesoplankton", "Macroplankton")) +
   labs(x = "Size group",
        y = bquote(bold("Carbon-mass specific Q"[10])),
        colour = "Size group") +
@@ -374,42 +340,4 @@ library(patchwork)
 tempPlot/sizeGQ10plot +
   plot_layout(guides = "collect") 
 
-
-
-# Lets generate Q10s for zooplankton in general ----
-# Extract slopes and calculate Q10 for overall zooplankton
-slopes <- emtrends(m1, ~ rate_name, var = "temp_C")
-
-slopes_Q10 <- as.data.frame(slopes) %>% 
-  mutate(Q10 = exp(10* temp_C.trend),
-         Q10_lwr = exp(10 * asymp.LCL),
-         Q10_upr = exp(10 * asymp.UCL))
-slopes_Q10
-
-
-# Define color palette ----
-rate_cols <- c("Clearance"   = "#66c2a5",
-               "Ingestion"   = "#fc8d62",
-               "Growth"      = "#8da0cb",
-               "Respiration" = "#e78ac3")
-
-
-# Plot allZoop Q10s
-allZoopQ10plot <- ggplot() +
-  geom_errorbar(data = slopes_Q10, 
-                aes(x = rate_name, ymin = Q10_lwr, ymax = Q10_upr), 
-                colour = "darkgray",
-                width = 0.05, linewidth = 1) +
-  geom_point(data = slopes_Q10, 
-             aes(x = rate_name, y = Q10, fill = rate_name),
-             size = 4, colour = "black", shape = 21) +
-  scale_fill_manual(values = rate_cols, guide = "none") +
-  labs(x = "Biological rate process",
-       y = bquote(bold("Carbon-mass specific Q"[10]))) +
-  theme(
-    axis.title = element_text(size = 11, face = "bold"),
-    axis.text = element_text(size = 10)
-  )
-
-allZoopQ10plot
 
