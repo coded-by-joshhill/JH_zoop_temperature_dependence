@@ -1,6 +1,6 @@
 # Calculating sizeGrps Q10s
 # Josh Hill
-# 25/02/2026
+# 11/03/2026
 
 
 
@@ -15,7 +15,6 @@
 library(tidyverse)
 library(glmmTMB) # for modelling
 library(DHARMa) # for diagnostics
-library(MuMIn) # for Rsqr
 library(emmeans) # Estimated marginal means
 library(performance)
 theme_set(new = theme_bw())
@@ -81,13 +80,6 @@ usedat %>%
 # Quickly view distribution of raw Cspecific_rates
 # I will use these to remove extreme outliers, particularly those that don't make biological sense
 usedat %>%
-  # exclude values that are not biologically reasonable or are extreme outliers
-  filter(
-    (rate_name == "Clearance" & Cspecific_rate < 15000) |
-    (rate_name == "Ingestion" & Cspecific_rate < 0.15) |
-    (rate_name == "Growth" & Cspecific_rate < 0.075) |
-    (rate_name == "Respiration" & Cspecific_rate < 60)
-  ) %>%
   ggplot() +
   geom_point(aes(x = temp_C, y = Cspecific_rate)) +
   theme_bw() +
@@ -99,12 +91,6 @@ usedat %>%
 
 usedat %>%
   # exclude values that are not biologically reasonable or are extreme outliers
-  filter(
-    (rate_name == "Clearance" & Cspecific_rate < 15000) |
-      (rate_name == "Ingestion" & Cspecific_rate < 0.15) |
-      (rate_name == "Growth" & Cspecific_rate < 0.075) |
-      (rate_name == "Respiration" & Cspecific_rate < 60)
-  ) %>%
   ggplot(aes(x = log(Cspecific_rate))) + # log because we will transform the data for analysis
   geom_histogram(bins = 50, fill = "pink", colour = "grey") +
   theme_bw() +
@@ -119,15 +105,8 @@ usedat %>%
 
 # Tidy up data and prep data for modelling ----
 mdat <- usedat %>% 
-  # exclude values that are not biologically reasonable or are extreme outliers
-  filter(
-    (rate_name == "Clearance" & Cspecific_rate < 15000) |
-      (rate_name == "Ingestion" & Cspecific_rate < 0.15) |
-      (rate_name == "Growth" & Cspecific_rate < 0.075) |
-      (rate_name == "Respiration" & Cspecific_rate < 60)
-  ) %>%
-  group_by(funcGrp) %>% 
-  filter(n() >= 15, # Exclude zoopGrps that don't have suitable data or temp ranges
+  group_by(sizeGrp) %>% 
+  filter(n() >= 15, # Exclude sizeGrp that don't have suitable data or temp ranges
          max(temp_C) - min(temp_C) >= 5) %>% 
   ungroup() %>% 
   mutate(ln_Cspecific_rate = log(Cspecific_rate)) # log transform mass-specific rate
@@ -164,13 +143,13 @@ summary(mdat)
 # A complex model with 3 way interactions for temp, sizeGrp and rate with random effects
 m1 <- glmmTMB(ln_Cspecific_rate ~ temp_C * rate_name * sizeGrp + 
                 (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
+              dispformula = ~rate_name,
               data = mdat) 
 
   # Check diagnostics
   sim <- simulateResiduals(m1)
   plot(sim) # looks pretty good
   summary(m1)
-  r.squaredGLMM(m1)
   # Kind of difficult to interpret I'll fit a simpler model to tease this apart
 
   
@@ -180,13 +159,13 @@ m2 <- glmmTMB(ln_Cspecific_rate ~
                 temp_C * sizeGrp +  # between temp and different sizeGrps for all rates
                 rate_name * sizeGrp + # between rates and sizeGrp 
                 (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
+              dispformula = ~rate_name,
               data = mdat) 
 
   # Check diagnostics
   sim <- simulateResiduals(m2)
   plot(sim) # Looks fine but seems less scattered compared to m1
   summary(m2)
-  r.squaredGLMM(m2)
   # temp:rate - looks like there is significantly different temp dependence among rates for all zoops
   # rate:grp - appears to be no signif differences among rates and sizeGrp but this doesn't include temperature in the interaction...
   # my random effects seem to be soaking up a fairly decent amount of variance, though there is less for the slope compared to intercept
@@ -198,24 +177,23 @@ m3 <- glmmTMB(ln_Cspecific_rate ~
                 temp_C * sizeGrp +  # between temp and different sizeGrps for all rates
                 rate_name * sizeGrp + # between rates and sizeGrp 
                 (1 | primRef) + (1 | taxa), # with primRef and taxa as random intercepts
+              dispformula = ~rate_name,
               data = mdat) 
 
   # Check diagnostics
   sim <- simulateResiduals(m3)
   plot(sim) # Looks fine but seems less scattered compared to m1
   summary(m3)
-  r.squaredGLMM(m3)
 
-
+# Compare models
 performance::compare_performance(m1, m2, m3)
-
+# m1 has the lowest AIC but m2 has the lowest BIC
 
 # Likelihood ratios test of the models
 anova(m1, m2, m3)
 # likelihood ratios test shows m2 has significantly more explanatory power than both m1 and m3
 # BIC is also slightly better
 # I will use m2 on the basis of the chisqr test and AIC...
-
 summary(m2)
 
 
@@ -265,8 +243,8 @@ PlotLMM = function(model){
                alpha = 0.2) +
     facet_wrap(~rate_name, scales = "free",
                labeller = as_labeller(c(
-                 "Clearance"   = "bold(Maximum~clearance~rate~(ml~mgC^-1~h^-1))",
-                 "Ingestion"   = "bold(Maximum~ingestion~rate~(mgC~mgC^-1~h^-1))",
+                 "Clearance"   = "bold(Clearance~rate~(ml~mgC^-1~h^-1))",
+                 "Ingestion"   = "bold(Ingestion~rate~(mgC~mgC^-1~h^-1))",
                  "Growth"      = "bold(Growth~rate~(mgC~mgC^-1~h^-1))",
                  "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))"
                ), 
@@ -300,7 +278,8 @@ sizeGrp_slopes <- emtrends(m2, ~ rate_name * sizeGrp, var = "temp_C")
 sizeGrp_slopes_Q10 <- as.data.frame(sizeGrp_slopes) %>% 
   mutate(Q10 = exp(10 * temp_C.trend),
          Q10_lwr = exp(10 * asymp.LCL),
-         Q10_upr = exp(10 * asymp.UCL))
+         Q10_upr = exp(10 * asymp.UCL)) %>% 
+  arrange(rate_name, sizeGrp)
 sizeGrp_slopes_Q10
 
 
@@ -316,12 +295,16 @@ sizeGQ10plot <- ggplot() +
              colour = "black") +
   facet_wrap(~rate_name, scales = "free",
              labeller = as_labeller(c(
-               "Clearance"   = "bold(Maximum~clearance~rate~(ml~mgC^-1~h^-1))",
-               "Ingestion"   = "bold(Maximum~ingestion~rate~(mgC~mgC^-1~h^-1))",
+               "Clearance"   = "bold(Clearance~rate~(ml~mgC^-1~h^-1))",
+               "Ingestion"   = "bold(Ingestion~rate~(mgC~mgC^-1~h^-1))",
                "Growth"      = "bold(Growth~rate~(mgC~mgC^-1~h^-1))",
                "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))"
              ), 
-             label_parsed))+  
+             label_parsed)) + 
+  geom_text(data = sizeGrp_slopes_Q10,
+            aes(x = sizeGrp, y = Q10, label = sprintf("%.2f", Q10)),
+            nudge_x = 0.20,
+            nudge_y = 0.0) +
   scale_colour_manual(values = grp_cols, labels = c("Mesoplankton", "Macroplankton")) +
   labs(x = "Size group",
        y = bquote(bold("Carbon-mass specific Q"[10])),
@@ -340,4 +323,7 @@ library(patchwork)
 tempPlot/sizeGQ10plot +
   plot_layout(guides = "collect") 
 
+# Save it
+ggsave("Output/Figure3/Figure3_tempPlot.pdf", tempPlot, width = 160, height = 150, units = "mm", dpi = 300)
+ggsave("Output/Figure3/Figure3_Q10Plot.pdf", sizeGQ10plot, width = 160, height = 70, units = "mm", dpi = 300)
 

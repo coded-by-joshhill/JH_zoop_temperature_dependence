@@ -1,6 +1,6 @@
 # Calculating funcGrps Q10s
 # Josh Hill
-# 25/02/2026
+# 03/11/2026
 
 
 
@@ -15,7 +15,6 @@
 library(tidyverse)
 library(glmmTMB) # for modelling
 library(DHARMa) # for diagnostics
-library(MuMIn) # for Rsqr
 library(emmeans) # Estimated marginal means
 library(performance)
 theme_set(new = theme_bw())
@@ -84,7 +83,7 @@ usedat %>%
 usedat %>%
   # exclude values that are not biologically reasonable or are extreme outliers
   filter(
-    (rate_name == "Clearance" & Cspecific_rate < 15000) |
+    (rate_name == "Clearance" & Cspecific_rate < 500) |
     (rate_name == "Ingestion" & Cspecific_rate < 0.15) |
     (rate_name == "Growth" & Cspecific_rate < 0.075) |
     (rate_name == "Respiration" & Cspecific_rate < 60)
@@ -120,15 +119,8 @@ usedat %>%
 
 # Tidy up data and prep data for modelling ----
 mdat <- usedat %>% 
-  # exclude values that are not biologically reasonable or are extreme outliers
-  filter(
-      (rate_name == "Clearance" & Cspecific_rate < 15000) |
-      (rate_name == "Ingestion" & Cspecific_rate < 0.15) |
-      (rate_name == "Growth" & Cspecific_rate < 0.075) |
-      (rate_name == "Respiration" & Cspecific_rate < 60)
-  ) %>%
   group_by(funcGrp) %>% 
-  filter(n() >= 15, # Exclude zoopGrps that don't have suitable data or temp ranges
+  filter(n() >= 15, # Exclude funcGrp that don't have suitable data or temp ranges
          max(temp_C) - min(temp_C) >= 5) %>% 
   ungroup() %>% 
   mutate(ln_Cspecific_rate = log(Cspecific_rate)) # log transform mass-specific rate
@@ -165,13 +157,13 @@ summary(mdat)
 # A complex model with 3 way interactions for temp, funcGrp and rate with random effects
 m1 <- glmmTMB(ln_Cspecific_rate ~ temp_C * rate_name * funcGrp + 
                 (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
+              dispformula = ~rate_name,
               data = mdat) 
 
   # Check diagnostics
   sim <- simulateResiduals(m1)
   plot(sim) # looks pretty good
   summary(m1)
-  r.squaredGLMM(m1)
   # Kind of difficult to interpret I'll fit a simpler model to tease this apart
 
   
@@ -181,13 +173,13 @@ m2 <- glmmTMB(ln_Cspecific_rate ~
                 temp_C * funcGrp +  # between temp and different funcGrps for all rates
                 rate_name * funcGrp + # between rates and funcGrp 
                 (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
+              dispformula = ~rate_name,
               data = mdat) 
 
   # Check diagnostics
   sim <- simulateResiduals(m2)
   plot(sim) # Looks fine but seems less scattered compared to m1
   summary(m2)
-  r.squaredGLMM(m2)
   # temp:rate - looks like there is significantly different temp dependence among rates for all zoops
   # rate:grp - appears to be no signif differences among rates and funcGrp but this doesn't include temperature in the interaction...
   # my random effects seem to be soaking up a fairly decent amount of variance, though there is less for the slope compared to intercept
@@ -199,6 +191,7 @@ m3 <- glmmTMB(ln_Cspecific_rate ~
                 temp_C * funcGrp +  # between temp and different funcGrps for all rates
                 rate_name * funcGrp + # between rates and funcGrp 
                 (1 | primRef) + (1 | taxa), # with primRef and taxa as random intercepts
+              dispformula = ~rate_name,
               data = mdat) 
 
   # Check diagnostics
@@ -207,16 +200,15 @@ m3 <- glmmTMB(ln_Cspecific_rate ~
   summary(m3)
   r.squaredGLMM(m3)
 
-
+# Check performance of models
 performance::compare_performance(m1, m2, m3)
-
+# m1 has slightly smaller AIC and BIC
 
 # Likelihood ratios test of the models
 anova(m1, m2, m3)
 # likelihood ratios test shows m2 has significantly more explanatory power than both m1 and m3
 # BIC is also slightly better
 # I will use m2 on the basis of the chisqr test and AIC...
-
 summary(m2)
 
 
@@ -304,7 +296,7 @@ funcGrp_slopes_Q10 <- as.data.frame(funcGrp_slopes) %>%
   mutate(Q10 = exp(10 * temp_C.trend),
          Q10_lwr = exp(10 * asymp.LCL),
          Q10_upr = exp(10 * asymp.UCL)) %>% 
-  arrange(rate_name)
+  arrange(rate_name, funcGrp)
 funcGrp_slopes_Q10
 
 
@@ -318,6 +310,10 @@ funcGQ10plot <- ggplot() +
   geom_point(data = funcGrp_slopes_Q10, aes(x = funcGrp, y = Q10),
              size = 3,
              colour = "black") +
+  geom_text(data = funcGrp_slopes_Q10,
+            aes(x = funcGrp, y = Q10, label = sprintf("%.2f", Q10)),
+            nudge_x = 0.20,
+            nudge_y = 0.0) +
   facet_wrap(~rate_name, scales = "free",
              labeller = as_labeller(c(
                "Clearance"   = "bold(Maximum~clearance~rate~(ml~mgC^-1~h^-1))",
@@ -343,4 +339,7 @@ library(patchwork)
 tempPlot/funcGQ10plot +
   plot_layout(guides = "collect") 
 
+# Save it
+ggsave("Output/Figure4/Figure4_tempPlot.pdf", tempPlot, width = 160, height = 150, units = "mm", dpi = 300)
+ggsave("Output/Figure4/Figure4_Q10Plot.pdf", funcGQ10plot, width = 160, height = 70, units = "mm", dpi = 300)
 

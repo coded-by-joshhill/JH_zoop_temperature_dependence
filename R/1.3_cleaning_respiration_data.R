@@ -28,14 +28,15 @@ dat <- read_csv("https://www.dropbox.com/scl/fi/itv9vpnu8twxz2fyhmp1u/Resp_dat.c
                           paste0("Hill_", row_number()), # apply a unique reference number
                           ref_no), # otherwise keep what is there
          taxa = str_squish(taxa)) %>% # remove extra spaces from taxon names
-  relocate(ref_no, .before = everything())  # move it before all columns
+  relocate(ref_no, .before = everything()) %>%   # move it before all columns
+  filter_out(data_type == "Mean") # exclude average values
 glimpse(dat)
 
   
   # Count number of initial pre-cleaned records
   dat %>% group_by(rate_name) %>% 
     summarise(count = n())
-  # RespirationRate  1036
+  # RespirationRate  992
 
 
   # Look at all unique taxon
@@ -51,7 +52,7 @@ glimpse(dat)
     group_by(rate_name) %>% 
     distinct(primRef, rate_name) %>% 
     summarise(count = n())
-      # 23 records
+      # 20 records
 
   
 
@@ -153,56 +154,6 @@ datClean <- dat %>%
     relocate(zoopGrp, .before = phylum) %>% 
     relocate(funcGrp, .before = zoopGrp) %>% 
     relocate(sizeGrp, .before = funcGrp)
-    
-  
-  # Count unique ZoopGrps rates
-  datClean %>% 
-    group_by(zoopGrp) %>% 
-    mutate(countZGrp = sum(zoopGrp > 1, na.rm = TRUE)) %>% 
-    distinct(zoopGrp, countZGrp) %>% 
-    arrange(countZGrp)
-    # Mysids              1
-    # Decapods            1
-    # Annelids            2
-    # Molluscs            4
-    # Amphipods          29
-    # Ctenophores        55
-    # Thaliaceans        88
-    # Euphausiids       236
-    # Cnidarians        241
-    # Copepods          379
-  
-  
-  # Count unique functional groups rates
-  datClean %>% 
-    group_by(funcGrp) %>% 
-    mutate(countFuncGrp = sum(funcGrp > 1, na.rm = TRUE)) %>% 
-    distinct(funcGrp, countFuncGrp) %>% 
-    arrange(countFuncGrp)
-    # OTHER                  6
-    # GelFilter             88
-    # GelPreds             296
-    # Crustaceans          646
-  
-  
-  # Count unique size groups rates
-  datClean %>% 
-    group_by(sizeGrp) %>% 
-    mutate(countSizeGrp = sum(sizeGrp > 1, na.rm = TRUE)) %>% 
-    distinct(sizeGrp, countSizeGrp) %>% 
-    arrange(countSizeGrp)
-    # OTHER                    1
-    # Mesoplankton           382
-    # Macroplankton          653
-  
-  
-  # Check the temperature range for each zoopGrp
-  datClean %>% 
-    select(zoopGrp, temp_C, rate_name) %>% 
-    group_by(zoopGrp) %>% 
-    summarise( 
-      temp_range = paste0(min(temp_C), "-", max(temp_C)))
-    # All have sensible ranges for estimating Q10, except for Amphipods, Annelids, Decapods, Molluscs, Mysids, 
 
 # End data cleaning ----
 
@@ -237,58 +188,103 @@ datFinal <- datClean %>%
   relocate(Cspecific_rate, .after = rate_name) %>% 
   relocate(Cspecific_unit, .after = Cspecific_rate) %>% 
   relocate(rate_value_clean, .after = Cspecific_unit) %>% 
-  relocate(rate_unit_clean, .after = rate_value_clean)
+  relocate(rate_unit_clean, .after = rate_value_clean) %>% 
+  filter(Cspecific_rate < 60) # exclude rates that are not biologically reasonable
 glimpse(datFinal)
 
-# End conversion
+# End harmonisation and conversion ----
 
 # Final checks
-# sizeGrp
-datFinal %>% 
-  ggplot() + 
-  geom_point(aes(x = temp_C, 
-                 y = log(Cspecific_rate), # mass-specific
-                 colour = sizeGrp))
+  # sizeGrp
+  datFinal %>% 
+    ggplot() + 
+    geom_point(aes(x = temp_C, 
+                   y = log(Cspecific_rate), # mass-specific
+                   colour = sizeGrp))
+  
+  # sizeGrp
+  datFinal %>% 
+    filter(rate_unit_clean == "ulO2/ind/hr") %>% 
+    ggplot() + 
+    geom_point(aes(x = temp_C, 
+                   y = log(rate_value_clean), # absolute
+                   colour = sizeGrp))
+  
+  
+  # funcGrp
+  datFinal %>% 
+    ggplot() + 
+    geom_point(aes(x = temp_C, 
+                   y = log(Cspecific_rate), # mass-specific
+                   colour = funcGrp))
+  
+  # funcGrp
+  datFinal %>% 
+    filter(rate_unit_clean == "ulO2/ind/hr") %>% 
+    ggplot() + 
+    geom_point(aes(x = temp_C, 
+                   y = log(rate_value_clean), # absolute
+                   colour = funcGrp))
+  
+  
+  # zoopGrp
+  datFinal %>% 
+    ggplot() + 
+    geom_point(aes(x = temp_C, 
+                   y = log(Cspecific_rate), # mass-specific
+                   colour = zoopGrp))
+  
+  # funcGrp
+  datFinal %>% 
+    filter(rate_unit_clean == "ulO2/ind/hr") %>% 
+    ggplot() + 
+    geom_point(aes(x = temp_C, 
+                   y = log(rate_value_clean), # absolute
+                   colour = zoopGrp))
 
-# sizeGrp
-datFinal %>% 
-  filter(rate_unit_clean == "ulO2/ind/hr") %>% 
-  ggplot() + 
-  geom_point(aes(x = temp_C, 
-                 y = log(rate_value_clean), # absolute
-                 colour = sizeGrp))
-
-
-# funcGrp
-datFinal %>% 
-  ggplot() + 
-  geom_point(aes(x = temp_C, 
-                 y = log(Cspecific_rate), # mass-specific
-                 colour = funcGrp))
-
-# funcGrp
-datFinal %>% 
-  filter(rate_unit_clean == "ulO2/ind/hr") %>% 
-  ggplot() + 
-  geom_point(aes(x = temp_C, 
-                 y = log(rate_value_clean), # absolute
-                 colour = funcGrp))
-
-
-# zoopGrp
-datFinal %>% 
-  ggplot() + 
-  geom_point(aes(x = temp_C, 
-                 y = log(Cspecific_rate), # mass-specific
-                 colour = zoopGrp))
-
-# funcGrp
-datFinal %>% 
-  filter(rate_unit_clean == "ulO2/ind/hr") %>% 
-  ggplot() + 
-  geom_point(aes(x = temp_C, 
-                 y = log(rate_value_clean), # absolute
-                 colour = zoopGrp))
+  
+  # Count unique ZoopGrps rates
+  datClean %>% 
+    group_by(zoopGrp) %>% 
+    mutate(countZGrp = sum(zoopGrp > 1, na.rm = TRUE)) %>% 
+    distinct(zoopGrp, countZGrp) %>% 
+    arrange(countZGrp)
+    # Amphipods          25
+    # Ctenophores        51
+    # Thaliaceans        84
+    # Euphausiids       222
+    # Cnidarians        240
+    # Copepods          370
+  
+  
+  # Count unique functional groups rates
+  datClean %>% 
+    group_by(funcGrp) %>% 
+    mutate(countFuncGrp = sum(funcGrp > 1, na.rm = TRUE)) %>% 
+    distinct(funcGrp, countFuncGrp) %>% 
+    arrange(countFuncGrp)
+    # GelFilter             84
+    # GelPreds             291
+    # Crustaceans          617
+  
+  
+  # Count unique size groups rates
+  datClean %>% 
+    group_by(sizeGrp) %>% 
+    mutate(countSizeGrp = sum(sizeGrp > 1, na.rm = TRUE)) %>% 
+    distinct(sizeGrp, countSizeGrp) %>% 
+    arrange(countSizeGrp)
+    # Mesoplankton           370
+    # Macroplankton          622
+  
+  
+  # Check the temperature range for each zoopGrp
+  datClean %>% 
+    select(zoopGrp, temp_C, rate_name) %>% 
+    group_by(zoopGrp) %>% 
+    summarise( 
+      temp_range = paste0(min(temp_C), "-", max(temp_C)))
+  # All have sensible ranges for estimating Q10, except for Amphipods
 
 # Save as RDS for later use
 # saveRDS(datFinal, "Data/resp_dat.rds")

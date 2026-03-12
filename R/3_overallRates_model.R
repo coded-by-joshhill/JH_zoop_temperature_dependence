@@ -1,6 +1,6 @@
 # Calculating overall rate Q10s
 # Josh Hill
-# 25/02/2026
+# 11/03/2026
 
 
 
@@ -15,7 +15,6 @@
 library(tidyverse)
 library(glmmTMB) # for modelling
 library(DHARMa) # for diagnostics
-library(MuMIn) # for Rsqr
 library(emmeans) # Estimated marginal means
 library(performance)
 theme_set(new = theme_bw())
@@ -73,13 +72,6 @@ usedat %>%
 # Quickly view distribution of raw Cspecific_rates
 # I will use these to remove extreme outliers, particularly those that don't make biological sense
 usedat %>%
-  # exclude values that are not biologically reasonable or are extreme outliers
-  filter(
-    (rate_name == "Clearance" & Cspecific_rate < 15000) |
-    (rate_name == "Ingestion" & Cspecific_rate < 0.15) |
-    (rate_name == "Growth" & Cspecific_rate < 0.075) |
-    (rate_name == "Respiration" & Cspecific_rate < 60)
-  ) %>%
   ggplot() +
   geom_point(aes(x = temp_C, y = Cspecific_rate)) +
   theme_bw() +
@@ -90,13 +82,6 @@ usedat %>%
 
 
 usedat %>%
-  # exclude values that are not biologically reasonable or are extreme outliers
-  filter(
-    (rate_name == "Clearance" & Cspecific_rate < 15000) |
-      (rate_name == "Ingestion" & Cspecific_rate < 0.15) |
-      (rate_name == "Growth" & Cspecific_rate < 0.075) |
-      (rate_name == "Respiration" & Cspecific_rate < 60)
-  ) %>%
   ggplot(aes(x = log(Cspecific_rate))) + # log because we will transform the data for analysis
   geom_histogram(bins = 50, fill = "pink", colour = "grey") +
   theme_bw() +
@@ -111,13 +96,6 @@ usedat %>%
 
 # Tidy up data and prep data for modelling ----
 mdat <- usedat %>% 
-  # exclude values that are not biologically reasonable or are extreme outliers
-  filter(
-    (rate_name == "Clearance" & Cspecific_rate < 15000) |
-      (rate_name == "Ingestion" & Cspecific_rate < 0.15) |
-      (rate_name == "Growth" & Cspecific_rate < 0.075) |
-      (rate_name == "Respiration" & Cspecific_rate < 60)
-  ) %>%
   mutate(ln_Cspecific_rate = log(Cspecific_rate)) # log transform mass-specific rate
 
 
@@ -142,13 +120,13 @@ summary(mdat)
 # A complex model with 2 way interactions for temp and rate with random effects
 m1 <- glmmTMB(ln_Cspecific_rate ~ temp_C * rate_name + 
                 (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
+              dispformula = ~rate_name,
               data = mdat) 
 
   # Check diagnostics
   sim <- simulateResiduals(m1)
   plot(sim) # looks pretty good
   summary(m1)
-  r.squaredGLMM(m1)
   # Kind of difficult to interpret I'll fit a simpler model to tease this apart
 
   
@@ -156,37 +134,35 @@ m1 <- glmmTMB(ln_Cspecific_rate ~ temp_C * rate_name +
 m2 <- glmmTMB(ln_Cspecific_rate ~ 
                 temp_C + rate_name + 
                 (temp_C | primRef) + (1 | taxa), # with primRef and taxa as random intercepts and slopes
+              dispformula = ~rate_name,
               data = mdat) 
 
   # Check diagnostics
   sim <- simulateResiduals(m2)
   plot(sim) # Looks fine but seems less scattered compared to m1
   summary(m2)
-  r.squaredGLMM(m2)
 
 
 # m1 but without random slopes, just intercepts
 m3 <- glmmTMB(ln_Cspecific_rate ~ 
                 temp_C * rate_name + # interactions between temp and different rates across all zooplankton
                 (1 | primRef) + (1 | taxa), # with primRef and taxa as random intercepts
+              dispformula = ~rate_name,
               data = mdat) 
 
   # Check diagnostics
   sim <- simulateResiduals(m3)
   plot(sim) # Looks fine but seems less scattered compared to m1
   summary(m3)
-  r.squaredGLMM(m3)
 
-
+# Compare models
 performance::compare_performance(m1, m2, m3)
-
+# m1 has lowest AIC and BIC
 
 # Likelihood ratios test of the models
 anova(m1, m2, m3)
-# likelihood ratios test shows m1 has significantly more explanatory power 
-# BIC is also slightly better
-# I will use m1 on the basis of the chisqr test and AIC and BIC
-
+# likelihood ratios test shows m1 and m3 have significantly more explanatory power 
+# we will proceed with m1
 summary(m1)
 
 
@@ -232,8 +208,8 @@ PlotLMM = function(model){
 
     facet_wrap(~rate_name, scales = "free",
                labeller = as_labeller(c(
-                 "Clearance"   = "bold(Maximum~clearance~rate~(ml~mgC^-1~h^-1))",
-                 "Ingestion"   = "bold(Maximum~ingestion~rate~(mgC~mgC^-1~h^-1))",
+                 "Clearance"   = "bold(Clearance~rate~(ml~mgC^-1~h^-1))",
+                 "Ingestion"   = "bold(Ingestion~rate~(mgC~mgC^-1~h^-1))",
                  "Growth"      = "bold(Growth~rate~(mgC~mgC^-1~h^-1))",
                  "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))"
                ), 
@@ -284,6 +260,10 @@ allZoopQ10plot <- ggplot() +
   geom_point(data = slopes_Q10, 
              aes(x = rate_name, y = Q10, fill = rate_name),
              size = 4, colour = "black", shape = 21) +
+  geom_text(data = slopes_Q10,
+            aes(x = rate_name, y = Q10, label = sprintf("%.2f", Q10)),
+            nudge_x = 0.22,
+            nudge_y = 0.01) +
   scale_fill_manual(values = rate_cols, guide = "none") +
   labs(x = "Biological rate process",
        y = bquote(bold("Carbon-mass specific Q"[10]))) +
@@ -297,5 +277,12 @@ allZoopQ10plot
 
 library(patchwork)
 
-tempPlot/allZoopQ10plot +
+fig2 <- tempPlot/allZoopQ10plot +
   plot_layout(guides = "collect")
+fig2
+
+
+# Save the plots
+ggsave("Output/Figure2/Figure2_tempPlot.pdf", tempPlot, width = 160, height = 150, units = "mm", dpi = 300)
+ggsave("Output/Figure2/Figure2_Q10Plot.pdf", allZoopQ10plot, width = 160, height = 70, units = "mm", dpi = 300)
+

@@ -2,6 +2,8 @@
 # Josh Hill
 # 25/02/2026
 
+# As it stands this analyses isn't going in the manuscript because there is not enough data across all zoopGrps for each rate...so the model has to drop several terms
+
 
 
   # Here I read in all cleaned data
@@ -15,7 +17,6 @@
 library(tidyverse)
 library(glmmTMB) # for modelling
 library(DHARMa) # for diagnostics
-library(MuMIn) # for Rsqr
 library(emmeans) # Estimated marginal means
 library(performance)
 theme_set(new = theme_bw())
@@ -62,8 +63,6 @@ respdat <- readRDS("Data/resp_dat.rds") %>%
 group_order <- c("Ctenophores",
                  "Cnidarians",
                  "Chaetognaths",
-                 "Molluscs",
-                 "Annelids",
                  "Amphipods",
                  "Copepods",
                  "Decapods",
@@ -93,19 +92,12 @@ usedat %>%
   # Growth:
     # won't be able to get estimates for mysids
   # Respiration:
-    # wont be able to get estimates for molluscs, annelids, amphipods, decapods, or mysids
+    # wont be able to get estimates for amphipods, decapods
 
 
 # Quickly view distribution of raw Cspecific_rates
 # I will use these to remove extreme outliers, particularly those that don't make biological sense
 usedat %>%
-  # exclude values that are not biologically reasonable or are extreme outliers
-  filter(
-    (rate_name == "Clearance" & Cspecific_rate < 15000) |
-    (rate_name == "Ingestion" & Cspecific_rate < 0.15) |
-    (rate_name == "Growth" & Cspecific_rate < 0.075) |
-    (rate_name == "Respiration" & Cspecific_rate < 60)
-  ) %>%
   ggplot() +
   geom_point(aes(x = temp_C, y = Cspecific_rate)) +
   theme_bw() +
@@ -116,13 +108,6 @@ usedat %>%
 
 
 usedat %>%
-  # exclude values that are not biologically reasonable or are extreme outliers
-  filter(
-    (rate_name == "Clearance" & Cspecific_rate < 15000) |
-      (rate_name == "Ingestion" & Cspecific_rate < 0.15) |
-      (rate_name == "Growth" & Cspecific_rate < 0.075) |
-      (rate_name == "Respiration" & Cspecific_rate < 60)
-  ) %>%
   ggplot(aes(x = log(Cspecific_rate))) + # log because we will transform the data for analysis
   geom_histogram(bins = 50, fill = "pink", colour = "grey") +
   theme_bw() +
@@ -136,23 +121,17 @@ usedat %>%
 
 
 # Tidy up data and prep data for modelling ----
-mdat <- usedat %>% 
-  # exclude values that are not biologically reasonable or are extreme outliers
-  filter(
-      (rate_name == "Clearance" & Cspecific_rate < 15000) |
-      (rate_name == "Ingestion" & Cspecific_rate < 0.15) |
-      (rate_name == "Growth" & Cspecific_rate < 0.075) |
-      (rate_name == "Respiration" & Cspecific_rate < 60)
-  ) %>%
+mdat <- usedat %>%
   # exclude groups lacking data
   filter_out(
     zoopGrp == "Chaetognaths" |
-    zoopGrp == "Annelids" |
-    zoopGrp == "Molluscs" |
-    zoopGrp == "Mysids" |
-    zoopGrp == "Decapods" |
-    zoopGrp == "Amphipods"
-               ) %>% 
+      zoopGrp == "Annelids" |
+      zoopGrp == "Mysids" |
+      zoopGrp == "Decapods" |
+      zoopGrp == "Amphipods" |
+      zoopGrp == "Appendicularians" |
+      zoopGrp == "Thaliaceans"
+  ) %>%
   mutate(ln_Cspecific_rate = log(Cspecific_rate)) # log transform mass-specific rate
 
 
@@ -187,13 +166,13 @@ summary(mdat)
 # A complex model with 3 way interactions for temp, zoopGrp and rate with random effects
 m1 <- glmmTMB(ln_Cspecific_rate ~ temp_C * rate_name * zoopGrp + 
                 (temp_C | primRef) + (1 | taxa), # with primRef and taxa as random intercepts and slopes
+              dispformula = ~rate_name,
               data = mdat) 
 
   # Check diagnostics
   sim <- simulateResiduals(m1)
   plot(sim) # looks pretty good
   summary(m1)
-  r.squaredGLMM(m1)
   # Kind of difficult to interpret I'll fit a simpler model to tease this apart
 
   
@@ -203,13 +182,13 @@ m2 <- glmmTMB(ln_Cspecific_rate ~
                 temp_C * zoopGrp +  # between temp and different zoopGrps for all rates
                 rate_name * zoopGrp + # between rates and zoopGrp 
                 (temp_C | primRef) + (1 | taxa), # with primRef and taxa as random intercepts and slopes
+              dispformula = ~rate_name,
               data = mdat) 
 
   # Check diagnostics
   sim <- simulateResiduals(m2)
   plot(sim) # Looks fine but seems less scattered compared to m1
   summary(m2)
-  r.squaredGLMM(m2)
   # temp:rate - looks like there is significantly different temp dependence among rates for all zoops
   # rate:grp - appears to be no signif differences among rates and zoopGrp but this doesn't include temperature in the interaction...
   # my random effects seem to be soaking up a fairly decent amount of variance, though there is less for the slope compared to intercept
@@ -221,6 +200,7 @@ m3 <- glmmTMB(ln_Cspecific_rate ~
                 temp_C * zoopGrp +  # between temp and different zoopGrps for all rates
                 rate_name * zoopGrp + # between rates and zoopGrp 
                 (1 | primRef) + (1 | taxa), # with primRef and taxa as random intercepts
+              dispformula = ~rate_name,
               data = mdat) 
 
   # Check diagnostics

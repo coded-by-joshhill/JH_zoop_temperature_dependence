@@ -26,28 +26,42 @@ dat <- read_csv("https://www.dropbox.com/scl/fi/b1pl3iys1kqtuiwbfd99h/IngClear_d
                 skip = 1) %>%
   mutate(ref_no = paste0("Hill_", row_number()),
          taxa = str_squish(taxa)) %>% # create a unique identifier (e.g., Hill_row#)
-  relocate(ref_no, .before = everything()) # move it before all columns
+  relocate(ref_no, .before = everything()) %>%  # move it before all columns
+  filter_out(data_type == "Mean") # remove any average values from the dataset
 glimpse(dat)
 
 
 
-# Pull maximum rates from replicates and means with maximum reported ----
-# Separate the data
-maxDat <- dat %>% filter(data_type == "Maximum")
-repDat <- dat %>% filter(data_type == "Replicate")
-  # Note, we exclude any data mean rate values here
+# Pull maximum rates from replicates for ingestion ----
+# Separate the data by Ingestion
+maxDat <- dat %>% filter(rate_name == "IngestionRate",
+                         data_type == "Maximum")
+repDat <- dat %>% filter(rate_name == "IngestionRate",
+                         data_type == "Replicate")
+# Note, we already excluded any mean rate values here, so they are not included in the analyses
 
 
-# Clean/compress replicate data to maximum rates for study across each unique taxa (based on name and body size) across each temp
+# Compress replicate data to maximum rates for each study across each unique taxa (based on name and body size) across each temp
 repDatClean <- repDat %>%
-  group_by(primRef, taxa, rate_name, temp_C, BM_C) %>%
-  slice_max(rate_value, n = 1, with_ties = FALSE) %>%
+  group_by(primRef, taxa, temp_C, BM_C) %>% # group the data by study, taxon, and associated temp and carbon mass
+  slice_max(rate_value, n = 1, with_ties = FALSE) %>% # slice the maximum rate value from that data
   ungroup()
   # Unfortunately we lose a bit of data...
 
-# Rejoin the data and start cleaning
-dat <- bind_rows(maxDat, repDatClean) %>% 
-  mutate(data_type = "Maximum")
+
+# Compress clearance data to minimum rates for each study as above...
+# because satiated clearance rates occur at the highest prey concentration, and some data here are pooled across many prey concentrations/types...we assume that the minimum rate value captures satiated conditions for each study, taxon and associated temperature and carbon weight
+satiatedClearDat <- dat %>% 
+  filter(rate_name == "ClearanceRate") %>% 
+  group_by(primRef, taxa, temp_C, BM_C) %>% # group the data by study, taxon, and associated temp and carbon mass
+  slice_min(rate_value, n = 1, with_ties = FALSE) %>% # slice the minimum rate value from that data
+  ungroup()
+  
+  
+
+# Rejoin the data to prepare for harmonisation ----
+dat <- bind_rows(maxDat, repDatClean, satiatedClearDat) %>%
+  mutate(data_type = "Satiated")
 
 
 
@@ -76,8 +90,8 @@ cMassDat <- dat %>%
   # Count number of initial pre-cleaned records
   dat %>% group_by(rate_name) %>% 
     summarise(count = n())
-    # ClearanceRate   579
-    # IngestionRate   300
+    # ClearanceRate   844
+    # IngestionRate   223
 
 
   # Look at all unique ClearanceRate taxon
@@ -106,7 +120,7 @@ cMassDat <- dat %>%
     distinct(primRef, rate_name) %>% 
     summarise(count = n())
       # ClearanceRate    71 records
-      # IngestionRate    48 records
+      # IngestionRate    43 records
 
   
 
@@ -212,101 +226,7 @@ datClean <- dat %>%
     relocate(sizeGrp, .before = funcGrp)
 
   
-  # Count unique ZoopGrps rates for ClearanceRate
-  datClean %>% 
-    filter(rate_name == "ClearanceRate") %>% 
-    group_by(zoopGrp) %>% 
-    mutate(countZGrp = sum(zoopGrp > 1, na.rm = TRUE)) %>% 
-    distinct(zoopGrp, countZGrp) %>% 
-    arrange(countZGrp)
-    # Ctenophores              3
-    # Chaetognaths             4
-    # Euphausiids             27
-    # Cnidarians              27
-    # Appendicularians        30
-    # Copepods               186
-    # Thaliaceans            278
   
-  
-  # Count unique functional groups rates for ClearanceRate
-  datClean %>% 
-    filter(rate_name == "ClearanceRate") %>% 
-    group_by(funcGrp) %>% 
-    mutate(countFuncGrp = sum(funcGrp > 1, na.rm = TRUE)) %>% 
-    distinct(funcGrp, countFuncGrp) %>% 
-    arrange(countFuncGrp)
-    # GelPreds              34
-    # Crustaceans          213
-    # GelFilter            308
-  
-  
-  # Count unique size groups rates for ClearanceRate
-  datClean %>% 
-    filter(rate_name == "ClearanceRate") %>% 
-    group_by(sizeGrp) %>% 
-    mutate(countSizeGrp = sum(sizeGrp > 1, na.rm = TRUE)) %>% 
-    distinct(sizeGrp, countSizeGrp) %>% 
-    arrange(countSizeGrp)
-    # Mesoplankton           220
-    # Macroplankton          335
-  
-  
-  # Check the temperature range for each zoopGrp
-  datClean %>% 
-    select(zoopGrp, temp_C, rate_name) %>% 
-    group_by(zoopGrp) %>% 
-    filter(rate_name == "ClearanceRate") %>% 
-    summarise(temp_range = paste0(min(temp_C), "-", max(temp_C)))
-      # All have sensible ranges for estimating Q10, except for Chaetognaths
-  
-  
-  # Count unique ZoopGrps rates for IngestionRate
-  datClean %>% 
-    filter(rate_name == "IngestionRate") %>% 
-    group_by(zoopGrp) %>% 
-    mutate(countZGrp = sum(zoopGrp > 1, na.rm = TRUE)) %>% 
-    distinct(zoopGrp, countZGrp) %>% 
-    arrange(countZGrp)
-    # Ctenophores              1
-    # Appendicularians         5
-    # Cnidarians               6
-    # Euphausiids             10
-    # Chaetognaths            79
-    # Thaliaceans             81
-    # Copepods               118
-  
-  
-  # Count unique functional groups rates for IngestionRate
-  datClean %>% 
-    filter(rate_name == "IngestionRate") %>% 
-    group_by(funcGrp) %>% 
-    mutate(countFuncGrp = sum(funcGrp > 1, na.rm = TRUE)) %>% 
-    distinct(funcGrp, countFuncGrp) %>% 
-    arrange(countFuncGrp)
-    # GelPreds              86
-    # GelFilter             86
-    # Crustaceans          128
-  
-  
-  # Count unique size groups rates for IngestionRate
-  datClean %>% 
-    filter(rate_name == "IngestionRate") %>% 
-    group_by(sizeGrp) %>% 
-    mutate(countSizeGrp = sum(sizeGrp > 1, na.rm = TRUE)) %>% 
-    distinct(sizeGrp, countSizeGrp) %>% 
-    arrange(countSizeGrp)
-    # Macroplankton          98
-    # Mesoplankton           202
-  
-  
-  # Check the temperature range for each zoopGrp
-  datClean %>% 
-    select(zoopGrp, temp_C, rate_name) %>% 
-    group_by(zoopGrp) %>% 
-    filter(rate_name == "IngestionRate") %>% 
-    summarise( 
-      temp_range = paste0(min(temp_C), "-", max(temp_C)))
-      # Really only have data available for copepods, euphausiids and thaliaceans
 
 # End data cleaning ----
     
@@ -351,37 +271,141 @@ datFinal <- datClean %>%
   relocate(Cspecific_rate, .after = rate_name) %>% 
   relocate(Cspecific_unit, .after = Cspecific_rate) %>% 
   relocate(rate_value_clean, .after = Cspecific_unit) %>% 
-  relocate(rate_unit_clean, .after = rate_value_clean)
+  relocate(rate_unit_clean, .after = rate_value_clean) %>% 
+  # Exclude rates that are not biologically reasonable
+  filter(rate_name == "ClearanceRate" & Cspecific_rate < 2000 | 
+         rate_name == "IngestionRate" & Cspecific_rate < 0.15)
+    
 glimpse(datFinal)
 
-# End conversion
+# End harmonisation and mass-specific conversion ----
+
+
 
 # Final checks
-# sizeGrp
-datFinal %>% 
-  ggplot() + 
-  geom_point(aes(x = temp_C, 
-                 y = log(Cspecific_rate), 
-                 colour = sizeGrp)) +
-  facet_wrap(~ rate_name, scales ="free")
+  # sizeGrp
+  datFinal %>% 
+    ggplot() + 
+    geom_point(aes(x = temp_C, 
+                   y = Cspecific_rate, 
+                   colour = primRef)) +
+    facet_wrap(~ rate_name, scales ="free")
+  
+  
+  # funcGrp
+  datFinal %>% 
+    ggplot() + 
+    geom_point(aes(x = temp_C, 
+                   y = log(Cspecific_rate), 
+                   colour = funcGrp)) +
+    facet_wrap(~ rate_name, scales ="free")
+  
+  
+  # zoopGrp
+  datFinal %>% 
+    ggplot() + 
+    geom_point(aes(x = temp_C, 
+                   y = log(Cspecific_rate), 
+                   colour = zoopGrp)) +
+    facet_wrap(~ rate_name, scales ="free")
 
 
-# funcGrp
-datFinal %>% 
-  ggplot() + 
-  geom_point(aes(x = temp_C, 
-                 y = log(Cspecific_rate), 
-                 colour = funcGrp)) +
-  facet_wrap(~ rate_name, scales ="free")
+  # Count unique ZoopGrps rates for ClearanceRate
+  datClean %>% 
+    filter(rate_name == "ClearanceRate") %>% 
+    group_by(zoopGrp) %>% 
+    mutate(countZGrp = sum(zoopGrp > 1, na.rm = TRUE)) %>% 
+    distinct(zoopGrp, countZGrp) %>% 
+    arrange(countZGrp)
+    # Chaetognaths             4
+    # Ctenophores              5
+    # Appendicularians        14
+    # Euphausiids             57
+    # Cnidarians             180
+    # Copepods               202
+    # Thaliaceans            230
 
 
-# zoopGrp
-datFinal %>% 
-  ggplot() + 
-  geom_point(aes(x = temp_C, 
-                 y = log(Cspecific_rate), 
-                 colour = zoopGrp)) +
-  facet_wrap(~ rate_name, scales ="free")
+  # Count unique functional groups rates for ClearanceRate
+  datClean %>% 
+    filter(rate_name == "ClearanceRate") %>% 
+    group_by(funcGrp) %>% 
+    mutate(countFuncGrp = sum(funcGrp > 1, na.rm = TRUE)) %>% 
+    distinct(funcGrp, countFuncGrp) %>% 
+    arrange(countFuncGrp)
+    # GelPreds             189
+    # GelFilter            244
+    # Crustaceans          259
 
+
+  # Count unique size groups rates for ClearanceRate
+  datClean %>% 
+    filter(rate_name == "ClearanceRate") %>% 
+    group_by(sizeGrp) %>% 
+    mutate(countSizeGrp = sum(sizeGrp > 1, na.rm = TRUE)) %>% 
+    distinct(sizeGrp, countSizeGrp) %>% 
+    arrange(countSizeGrp)
+    # Mesoplankton           220
+    # Macroplankton          472
+  
+  
+  # Check the temperature range for each zoopGrp
+  datClean %>% 
+    select(zoopGrp, temp_C, rate_name) %>% 
+    group_by(zoopGrp) %>% 
+    filter(rate_name == "ClearanceRate") %>% 
+    summarise(temp_range = paste0(min(temp_C), "-", max(temp_C)))
+    # All have sensible ranges for estimating Q10, except for Chaetognaths
+
+
+  # Count unique ZoopGrps rates for IngestionRate
+  datClean %>% 
+    filter(rate_name == "IngestionRate") %>% 
+    group_by(zoopGrp) %>% 
+    mutate(countZGrp = sum(zoopGrp > 1, na.rm = TRUE)) %>% 
+    distinct(zoopGrp, countZGrp) %>% 
+    arrange(countZGrp)
+    # Appendicularians         5
+    # Cnidarians               6
+    # Euphausiids              8
+    # Chaetognaths            12
+    # Thaliaceans             81
+    # Copepods               111
+
+
+  # Count unique functional groups rates for IngestionRate
+  datClean %>% 
+    filter(rate_name == "IngestionRate") %>% 
+    group_by(funcGrp) %>% 
+    mutate(countFuncGrp = sum(funcGrp > 1, na.rm = TRUE)) %>% 
+    distinct(funcGrp, countFuncGrp) %>% 
+    arrange(countFuncGrp)
+    # GelPreds              18
+    # GelFilter             86
+    # Crustaceans          119
+
+
+  # Count unique size groups rates for IngestionRate
+  datClean %>% 
+    filter(rate_name == "IngestionRate") %>% 
+    group_by(sizeGrp) %>% 
+    mutate(countSizeGrp = sum(sizeGrp > 1, na.rm = TRUE)) %>% 
+    distinct(sizeGrp, countSizeGrp) %>% 
+    arrange(countSizeGrp)
+    # Macroplankton           95
+    # Mesoplankton           128
+
+
+  # Check the temperature range for each zoopGrp
+  datClean %>% 
+    select(zoopGrp, temp_C, rate_name) %>% 
+    group_by(zoopGrp) %>% 
+    filter(rate_name == "IngestionRate") %>% 
+    summarise( 
+      temp_range = paste0(min(temp_C), "-", max(temp_C)))
+    # Really only have data available for copepods, euphausiids and thaliaceans
+
+  
 # Save it as an RDS for later use
 # saveRDS(datFinal, "Data/clear_ingest_data.rds")
+
