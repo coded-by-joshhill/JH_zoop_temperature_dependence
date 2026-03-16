@@ -117,53 +117,83 @@ summary(mdat)
 
 # Fit the models ----
 
-# A complex model with 2 way interactions for temp and rate with random effects
-m1 <- glmmTMB(ln_Cspecific_rate ~ temp_C * rate_name + 
+# A complex model with 2 way interactions for temp and rate with random slopes and intercepts
+m1 <- glmmTMB(ln_Cspecific_rate ~ 
+                temp_C * rate_name + # interactions between temp and different rates across all zooplankton
                 (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
-              dispformula = ~rate_name,
+              dispformula = ~rate_name, # use dispersion submodel because clearance and ingestion are slightly skewed 
               data = mdat) 
 
   # Check diagnostics
   sim <- simulateResiduals(m1)
   plot(sim) # looks pretty good
   summary(m1)
-  # Kind of difficult to interpret I'll fit a simpler model to tease this apart
+  # Kind of difficult to interpret I'll use emtrends to extract rate-specific slopes later
 
   
-# A simpler model without interactions
+# A simpler model with only random intercepts
 m2 <- glmmTMB(ln_Cspecific_rate ~ 
-                temp_C + rate_name + 
-                (temp_C | primRef) + (1 | taxa), # with primRef and taxa as random intercepts and slopes
+                temp_C * rate_name + # interactions between temp and different rates across all zooplankton
+                (1 | primRef) + (1 | taxa), # with primRef and taxa as random intercepts only
               dispformula = ~rate_name,
-              data = mdat) 
+              data = mdat)
 
   # Check diagnostics
   sim <- simulateResiduals(m2)
-  plot(sim) # Looks fine but seems less scattered compared to m1
+  plot(sim) # Looks ok but seems less scattered compared to m1
   summary(m2)
 
 
-# m1 but without random slopes, just intercepts
+# m1 but without the dispersion submodel
 m3 <- glmmTMB(ln_Cspecific_rate ~ 
-                temp_C * rate_name + # interactions between temp and different rates across all zooplankton
-                (1 | primRef) + (1 | taxa), # with primRef and taxa as random intercepts
-              dispformula = ~rate_name,
-              data = mdat) 
-
+                temp_C * rate_name + 
+                (temp_C | primRef) + (temp_C | taxa),
+              dispformula = ~1,
+              data = mdat)
   # Check diagnostics
   sim <- simulateResiduals(m3)
   plot(sim) # Looks fine but seems less scattered compared to m1
   summary(m3)
 
+  
 # Compare models
 performance::compare_performance(m1, m2, m3)
-# m1 has lowest AIC and BIC
+# Models are not all mutually nested...we'll just treat AIC/BIC as descriptive...
+# Seems like m1 is the best fit so far
+
 
 # Likelihood ratios test of the models
-anova(m1, m2, m3)
-# likelihood ratios test shows m1 and m3 have significantly more explanatory power 
-# we will proceed with m1
+# Refit with REML for valid test on fixed/dispersion and random effect structures
+m1_m1 <- update(m1, REML = FALSE)
+m2_m2 <- update(m2, REML = FALSE)
+m3_m3 <- update(m3, REML = FALSE)
+
+anova(m1_m1, m2_m2) # test which random effects structure is a better fit
+  # m1 is better
+
+anova(m1_m1, m3_m3) # test if dispersion submodel is justified
+  # m1 is still best fit, dispersion submodel is improving my explanatory power here
+# we will proceed with m1 on the basis of AIC, BIC and likelihood ratio tests
 summary(m1)
+
+
+# Extract slopes and calculate Q10 for overall zooplankton ----
+slopes <- emtrends(m1, ~ rate_name, var = "temp_C")
+summary(slopes, infer = TRUE)
+test(slopes) # test whether each slope is different from zero
+  # all except growth
+pairs(slopes) # pairwise test whether slopes differ significantly across rate types
+  # only slight difference between clearance and ingestion
+  # no significant difference between clearance and respiration
+  # no significant difference between ingestion and respiration
+
+# Get Q10
+slopes_Q10 <- as.data.frame(slopes) %>% 
+  mutate(Q10 = exp(10* temp_C.trend),
+         Q10_lwr = exp(10 * asymp.LCL),
+         Q10_upr = exp(10 * asymp.UCL))
+slopes_Q10
+
 
 
 
@@ -234,17 +264,9 @@ tempPlot
 
 
 # Generate Q10s for zooplankton in general ----
-# Extract slopes and calculate Q10 for overall zooplankton
-slopes <- emtrends(m1, ~ rate_name, var = "temp_C")
-
-slopes_Q10 <- as.data.frame(slopes) %>% 
-  mutate(Q10 = exp(10* temp_C.trend),
-         Q10_lwr = exp(10 * asymp.LCL),
-         Q10_upr = exp(10 * asymp.UCL))
-slopes_Q10
 
 
-# Define color palette ----
+# Define color palette
 rate_cols <- c("Clearance"   = "#66c2a5",
                "Ingestion"   = "#fc8d62",
                "Growth"      = "#8da0cb",

@@ -1,8 +1,6 @@
 # Calculating zoopGrps Q10s
 # Josh Hill
-# 25/02/2026
-
-# As it stands this analyses isn't going in the manuscript because there is not enough data across all zoopGrps for each rate...so the model has to drop several terms
+# 13/03/2026
 
 
 
@@ -123,15 +121,15 @@ usedat %>%
 # Tidy up data and prep data for modelling ----
 mdat <- usedat %>%
   # exclude groups lacking data
-  filter_out(
-    zoopGrp == "Chaetognaths" |
-      zoopGrp == "Annelids" |
-      zoopGrp == "Mysids" |
-      zoopGrp == "Decapods" |
-      zoopGrp == "Amphipods" |
-      zoopGrp == "Appendicularians" |
-      zoopGrp == "Thaliaceans"
-  ) %>%
+  # filter_out(
+  #   zoopGrp == "Chaetognaths" |
+  #     zoopGrp == "Annelids" |
+  #     zoopGrp == "Mysids" |
+  #     zoopGrp == "Decapods" |
+  #     zoopGrp == "Amphipods" |
+  #     zoopGrp == "Appendicularians" |
+  #     zoopGrp == "Thaliaceans"
+  # ) %>%
   mutate(ln_Cspecific_rate = log(Cspecific_rate)) # log transform mass-specific rate
 
 
@@ -167,13 +165,35 @@ summary(mdat)
 m1 <- glmmTMB(ln_Cspecific_rate ~ temp_C * rate_name * zoopGrp + 
                 (temp_C | primRef) + (1 | taxa), # with primRef and taxa as random intercepts and slopes
               dispformula = ~rate_name,
-              data = mdat) 
+              data = mdat)
 
   # Check diagnostics
   sim <- simulateResiduals(m1)
   plot(sim) # looks pretty good
   summary(m1)
   # Kind of difficult to interpret I'll fit a simpler model to tease this apart
+
+# Columns are being dropped from rank-deficient conditional model - probably not enough data for a few groups across all rates
+  
+  # Are all zoopGrp levels present across all rate types?
+  mdat %>%
+    group_by(zoopGrp) %>%
+    summarise(rates_present = n_distinct(rate_name),
+              n = n())
+  # nope, which I suspected was the issue
+
+
+# Two-way counts
+mdat %>%
+  count(rate_name, zoopGrp) %>%
+  pivot_wider(names_from = zoopGrp, values_from = n, values_fill = 0)
+
+mdat %>%
+  count(temp_C, zoopGrp) %>%
+  pivot_wider(names_from = zoopGrp, values_from = n, values_fill = 0) %>% 
+  print(n = "Inf")
+
+# There are many zeros here across the groups and rates... I'll try fit a two-way interaction model
 
   
 # A simpler model without the 3-way interactions, just 2-way interactions
@@ -185,41 +205,10 @@ m2 <- glmmTMB(ln_Cspecific_rate ~
               dispformula = ~rate_name,
               data = mdat) 
 
-  # Check diagnostics
-  sim <- simulateResiduals(m2)
-  plot(sim) # Looks fine but seems less scattered compared to m1
-  summary(m2)
-  # temp:rate - looks like there is significantly different temp dependence among rates for all zoops
-  # rate:grp - appears to be no signif differences among rates and zoopGrp but this doesn't include temperature in the interaction...
-  # my random effects seem to be soaking up a fairly decent amount of variance, though there is less for the slope compared to intercept
+# This is still no good. I'll move to separating the data by rates and fitting separate models instead of trying to force an individual model
 
 
-# m1 but without random slopes, just intercepts
-m3 <- glmmTMB(ln_Cspecific_rate ~ 
-                temp_C * rate_name + # interactions between temp and different rates across all zooplankton
-                temp_C * zoopGrp +  # between temp and different zoopGrps for all rates
-                rate_name * zoopGrp + # between rates and zoopGrp 
-                (1 | primRef) + (1 | taxa), # with primRef and taxa as random intercepts
-              dispformula = ~rate_name,
-              data = mdat) 
 
-  # Check diagnostics
-  sim <- simulateResiduals(m3)
-  plot(sim) # Looks fine but seems less scattered compared to m1
-  summary(m3)
-  r.squaredGLMM(m3)
-
-
-performance::compare_performance(m1, m2, m3)
-
-
-# Likelihood ratios test of the models
-anova(m1, m2, m3)
-# likelihood ratios test shows m2 has significantly more explanatory power than both m1 and m3
-# BIC is also slightly better
-# I will use m2 on the basis of the chisqr test and AIC...
-
-summary(m2)
 
 
 

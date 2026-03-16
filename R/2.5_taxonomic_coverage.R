@@ -69,10 +69,10 @@ taxonomic_coverage
 
 # Table S1
 # Dataset     n_species n_genera n_families n_orders n_classes n_phylas n_zoopGrps n_observations
-# Clearance          74       38         28       12         8        5          7           1186
-# Ingestion          58       29         22       10         7        5          7            471
-# Growth             48       32         28       16         7        5          9            685
-# Respiration       117       65         47       20        10        6         10           1036
+# 1 Clearance          65       35         27       12         8        5          7            618
+# 2 Ingestion          44       21         16        7         5        3          5            307
+# 3 Growth             48       32         28       16         7        5          9            681
+# 4 Respiration       103       55         39       15         7        4          6            982
 
 
 
@@ -378,7 +378,8 @@ tempDat_binded %>%
     n_total = n(),
     n_temp_range = sum(temp_C >= 0 & temp_C <= 30, na.rm = TRUE),
     prop_temp_range = n_temp_range / n_total * 100)
-    # 94.3% of the data is between 0 and 30
+    # n_total n_temp_range prop_temp_range
+    # 2588         2455            94.9
 
 
 
@@ -428,9 +429,9 @@ foodDat_binded %>%
   print(n = "Inf")
       # Table S1 - Proportion of methods used for original data collection
       # method                    n         prop_method
-      # 1 Not reported         1915       56.7 
-      # 2 Controlled experiment  1311       38.8 
-      # 3 In situ experiment     152        4.50
+      # Not reported           1768       68.3 
+      # Controlled experiment   764       29.5 
+      # In situ experiment       56       2.16
 
 
 
