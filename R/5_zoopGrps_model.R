@@ -118,18 +118,8 @@ usedat %>%
 
 
 
-# Tidy up data and prep data for modelling ----
+# Prep data for modelling ----
 mdat <- usedat %>%
-  # exclude groups lacking data
-  # filter_out(
-  #   zoopGrp == "Chaetognaths" |
-  #     zoopGrp == "Annelids" |
-  #     zoopGrp == "Mysids" |
-  #     zoopGrp == "Decapods" |
-  #     zoopGrp == "Amphipods" |
-  #     zoopGrp == "Appendicularians" |
-  #     zoopGrp == "Thaliaceans"
-  # ) %>%
   mutate(ln_Cspecific_rate = log(Cspecific_rate)) # log transform mass-specific rate
 
 
@@ -162,7 +152,8 @@ summary(mdat)
 # Fit the models ----
 
 # A complex model with 3 way interactions for temp, zoopGrp and rate with random effects
-m1 <- glmmTMB(ln_Cspecific_rate ~ temp_C * rate_name * zoopGrp + 
+m1 <- glmmTMB(ln_Cspecific_rate ~ 
+                temp_C * rate_name * zoopGrp + # 3-way interaction
                 (temp_C | primRef) + (1 | taxa), # with primRef and taxa as random intercepts and slopes
               dispformula = ~rate_name,
               data = mdat)
@@ -171,14 +162,14 @@ m1 <- glmmTMB(ln_Cspecific_rate ~ temp_C * rate_name * zoopGrp +
   sim <- simulateResiduals(m1)
   plot(sim) # looks pretty good
   summary(m1)
-  # Kind of difficult to interpret I'll fit a simpler model to tease this apart
 
 # Columns are being dropped from rank-deficient conditional model - probably not enough data for a few groups across all rates
+# Lets check the counts for each fixed effect before progressing
   
   # Are all zoopGrp levels present across all rate types?
   mdat %>%
     group_by(zoopGrp) %>%
-    summarise(rates_present = n_distinct(rate_name),
+    summarise(rates_n = n_distinct(rate_name),
               n = n())
   # nope, which I suspected was the issue
 
@@ -187,47 +178,186 @@ m1 <- glmmTMB(ln_Cspecific_rate ~ temp_C * rate_name * zoopGrp +
 mdat %>%
   count(rate_name, zoopGrp) %>%
   pivot_wider(names_from = zoopGrp, values_from = n, values_fill = 0)
+  # 13 rate to group combinations lacking data to estimate coefficients
 
-mdat %>%
-  count(temp_C, zoopGrp) %>%
-  pivot_wider(names_from = zoopGrp, values_from = n, values_fill = 0) %>% 
-  print(n = "Inf")
-
-# There are many zeros here across the groups and rates... I'll try fit a two-way interaction model
+# Because there are many zeros across the groups and rates...I will fit per-rate models to estimate temperature dependence for available groups
 
   
-# A simpler model without the 3-way interactions, just 2-way interactions
-m2 <- glmmTMB(ln_Cspecific_rate ~ 
-                temp_C * rate_name + # interactions between temp and different rates across all zooplankton
-                temp_C * zoopGrp +  # between temp and different zoopGrps for all rates
-                rate_name * zoopGrp + # between rates and zoopGrp 
-                (temp_C | primRef) + (1 | taxa), # with primRef and taxa as random intercepts and slopes
-              dispformula = ~rate_name,
-              data = mdat) 
+# Per-rate models ----
+m2 <- mdat %>% # using my model data
+  group_by(rate_name) %>% # group by each rate 
+  nest() %>% 
+  mutate(data = map2(data, rate_name, \(d, r) {
+    d %>%
+      group_by(zoopGrp) %>%
+      filter(n() >= 15, # drop groups with < 15 obs for this rate
+             max(temp_C) - min(temp_C) >= 5) %>% # drop groups with insufficient temperature range
+      ungroup() %>%
+      droplevels() # remove empty factor levels so glmmTMB doesn't see them
+    }),
+    fit = map(data, \(d) glmmTMB( # fit a glmmTMB to each rate 
+      ln_Cspecific_rate ~ # log(mass-specific rate) as a function of...
+        temp_C * zoopGrp + # temp and different zoopGrps (2-way interaction) for each rate
+        (1 | primRef) + (1 | taxa), # with primRef and taxa as random intercepts - not enough data to include random slopes
+      data = d,
+      family = gaussian() # use gaussian for now, we can update each model afterwards
+      )))
 
-# This is still no good. I'll move to separating the data by rates and fitting separate models instead of trying to force an individual model
+
+# Extract each model using the name
+m_clearance   <- m2$fit[m2$rate_name == "Clearance"][[1]]
+m_ingestion   <- m2$fit[m2$rate_name == "Ingestion"][[1]]
+m_growth      <- m2$fit[m2$rate_name == "Growth"][[1]]
+m_respiration <- m2$fit[m2$rate_name == "Respiration"][[1]]
+
+# Get the data too
+d_clearance   <- m2$data[m2$rate_name == "Clearance"][[1]]
+d_ingestion   <- m2$data[m2$rate_name == "Ingestion"][[1]]
+d_growth      <- m2$data[m2$rate_name == "Growth"][[1]]
+d_respiration <- m2$data[m2$rate_name == "Respiration"][[1]]
 
 
+# Check diagnostics
+# Clearance
+sim <- simulateResiduals(m_clearance)
+plot(sim) # doesn't look great
+plotResiduals(sim, form = d_clearance$zoopGrp)
+plotResiduals(sim, form = d_clearance$temp_C)
+# Let's update the model with a dispersion formula to try improve heteroscedasticity
+m_clearance2 <- update(m_clearance, dispformula = ~zoopGrp, data = d_clearance)
+sim <- simulateResiduals(m_clearance2)
+plot(sim) 
+plotResiduals(sim, form = d_clearance$zoopGrp)
+plotResiduals(sim, form = d_clearance$temp_C)
+# doesn't seem to have improved anything, we will stick with the first model and accept this as a limitation instead of overfitting this data
+summary(m_clearance)
 
+
+# Ingestion
+sim <- simulateResiduals(m_ingestion)
+plot(sim) # basically have the same issue here with ingestion
+m_ingestion2 <- update(m_ingestion, dispformula = ~zoopGrp, data = d_ingestion)
+sim <- simulateResiduals(m_ingestion2)
+plot(sim) # also no difference...
+summary(m_ingestion)
+
+
+# Growth
+sim <- simulateResiduals(m_growth)
+plot(sim) # residuals are sitting above the line on the QQ plot, probabaly an artefact of slightly left-skewed data
+  # the residuals vs predicted plot looks OK
+summary(m_growth)
+
+
+# Respiration
+sim <- simulateResiduals(m_respiration)
+plot(sim) # looks pretty good overall
+summary(m_respiration)
+
+
+# Extract slopes using and calculate Q10 for each zoopGrp ----
+# Clearance
+clear_slopes <- emtrends(m_clearance, ~zoopGrp, var = "temp_C")
+summary(clear_slopes, infer = TRUE) # test whether each slope is different from zero for each zoopGrp
+pairs(clear_slopes)
+  # No sig differences between any groups for clearance rate
+
+clearanceQ10 <- as.data.frame(clear_slopes) %>% 
+  mutate(Q10 = exp(10 * temp_C.trend),
+         Q10_lwr = exp(10 * asymp.LCL),
+         Q10_upr = exp(10 * asymp.UCL))
+clearanceQ10
+
+
+# Ingestion
+ingest_slopes <- emtrends(m_ingestion, ~zoopGrp, var = "temp_C")
+summary(ingest_slopes, infer = TRUE) # test whether each slope is different from zero for each zoopGrp
+pairs(ingest_slopes)
+  # No sig differences between any groups for ingestion rate
+
+ingestionQ10 <- as.data.frame(ingest_slopes) %>% 
+  mutate(Q10 = exp(10 * temp_C.trend),
+         Q10_lwr = exp(10 * asymp.LCL),
+         Q10_upr = exp(10 * asymp.UCL))
+ingestionQ10
+
+
+# Growth
+growth_slopes <- emtrends(m_growth, ~zoopGrp, var = "temp_C")
+summary(growth_slopes, infer = TRUE)# test whether each slope is different from zero for each zoopGrp
+pairs(growth_slopes) %>%
+  as.data.frame() %>%
+  mutate(sig = case_when(
+    p.value < 0.001 ~ "***",
+    p.value < 0.01  ~ "**",
+    p.value < 0.05  ~ "*",
+    TRUE            ~ "ns"))
+
+growthQ10 <- as.data.frame(growth_slopes) %>% 
+  mutate(Q10 = exp(10 * temp_C.trend),
+         Q10_lwr = exp(10 * asymp.LCL),
+         Q10_upr = exp(10 * asymp.UCL))
+growthQ10
+
+
+# Respiration
+resp_slopes <- emtrends(m_respiration, ~zoopGrp, var = "temp_C")
+summary(resp_slopes, infer = TRUE) # test whether each slope is different from zero for each zoopGrp
+pairs(resp_slopes) %>%
+  as.data.frame() %>%
+  mutate(sig = case_when(
+    p.value < 0.001 ~ "***",
+    p.value < 0.01  ~ "**",
+    p.value < 0.05  ~ "*",
+    TRUE            ~ "ns"))
+
+respQ10 <- as.data.frame(resp_slopes) %>% 
+  mutate(Q10 = exp(10 * temp_C.trend),
+         Q10_lwr = exp(10 * asymp.LCL),
+         Q10_upr = exp(10 * asymp.UCL))
+respQ10
+
+
+# Print summaries
+summary(m_clearance)
+summary(m_ingestion)
+summary(m_growth)
+summary(m_respiration)
 
 
 
 # Prep for plotting ----
+
+# Update mdat
+mdat <- bind_rows(m_clearance, m_ingestion, m_growth, m_respiration)
+mdat %>% distinct(zoopGrp)
+
+# Define group colours
+grp_cols <- c(
+  "Ctenophores" = "#F8766D",
+  "Cnidarians"  = "#CD9600",
+  "Chaetognaths"= "#7CAE00",
+  "Amphipods"   = "#00BE67",
+  "Copepods"    = "#00BFC4",
+  "Decapods"    = "#00A9FF",
+  "Euphausiids" = "#C77CFF",
+  "Thaliaceans" = "#FF61CC")
+
 
 # Set min and max temp
 minTempC <- min(mdat$temp_C)
 maxTempC <- max(mdat$temp_C)
 
 
+
 # FUNCTIOIN TO PLOT MODEL ----
-PlotLMM = function(model){
+PlotLMM = function(model, data){
   temp_seq <- seq(minTempC, maxTempC, length.out = 100)
   
   # Build newdata grid manually
   newdat <- expand.grid(
     temp_C    = temp_seq,
-    zoopGrp   = unique(mdat$zoopGrp), # levels of zoopGrp
-    rate_name = unique(mdat$rate_name) # levels of rates
+    zoopGrp   = unique(data$zoopGrp) # levels of zoopGrp
   )
   
   # Zooplankton-level (population) predictions
@@ -248,25 +378,19 @@ PlotLMM = function(model){
     geom_line(data = pop_preds,
               aes(x = temp_C, y = estimate, colour = zoopGrp),
               linewidth = 1) +
-    geom_point(data = mdat,
+    geom_point(data = data,
                aes(x = temp_C, y = ln_Cspecific_rate, colour = zoopGrp),
                alpha = 0.2) +
-    facet_wrap(~rate_name, scales = "free",
-               labeller = as_labeller(c(
-                 "Clearance"   = "bold(Maximum~clearance~rate~(ml~mgC^-1~h^-1))",
-                 "Ingestion"   = "bold(Maximum~ingestion~rate~(mgC~mgC^-1~h^-1))",
-                 "Growth"      = "bold(Growth~rate~(mgC~mgC^-1~h^-1))",
-                 "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))"
-               ), 
-               label_parsed))+ 
     coord_cartesian(xlim = c(-2, 32)) +
     labs(x = "Temp (°C)",
-         y = "ln(Carbon-mass specific rate)",
          fill = "Taxonomic group",
          colour = "Taxonomic group") +
+    scale_fill_manual(values = grp_cols) +
+    scale_colour_manual(values = grp_cols) +
     theme_bw() +
     theme(
       strip.background = element_rect(fill = "whitesmoke", colour = "black"),
+      strip.text = element_text(face = "bold"),
       axis.title = element_text(size = 11, face = "bold"),
       axis.text = element_text(size = 10),
       legend.title = element_text(size = 10, face = "bold")
@@ -276,54 +400,153 @@ PlotLMM = function(model){
 
 
 # Plot it
-tempPlot <- PlotLMM(m2)
-tempPlot
-
-  
-# Extract slopes using and calculate Q10 for each zoopGrp
-zoopGrp_slopes <- emtrends(m1, ~ rate_name * zoopGrp, var = "temp_C")
-
-zoopGrp_slopes_Q10 <- as.data.frame(zoopGrp_slopes) %>% 
-  mutate(Q10 = exp(10 * temp_C.trend),
-         Q10_lwr = exp(10 * asymp.LCL),
-         Q10_upr = exp(10 * asymp.UCL)) %>% 
-  arrange(rate_name)
-zoopGrp_slopes_Q10
+# Clearance
+clearPlot <- PlotLMM(m_clearance, d_clearance) + 
+  labs(y = expression(bold("ln(Clearance rate (ml mgC"^-1*" h"^-1*"))"))) +
+  theme(legend.position = "none") +
+  facet_wrap(~zoopGrp, nrow = 1)
+clearPlot
 
 
+# Ingestion
+ingPlot <- PlotLMM(m_ingestion, d_ingestion) + 
+  labs(y = expression(bold("ln(Ingestion rate (mgC mgC"^-1*" h"^-1*"))"))) +
+  theme(legend.position = "none") +
+  facet_wrap(~zoopGrp, nrow = 1)
+ingPlot
 
-# Plot zoopGrp Q10s
-zoopGQ10plot <- ggplot() +
-  geom_errorbar(data = zoopGrp_slopes_Q10, 
-                aes(x = zoopGrp, ymin = Q10_lwr, ymax = Q10_upr, colour = zoopGrp),
-                width = .05,
-                linewidth = 1) +
-  geom_point(data = zoopGrp_slopes_Q10, aes(x = zoopGrp, y = Q10),
-             size = 3,
-             colour = "black") +
-  facet_wrap(~rate_name, scales = "free",
-             labeller = as_labeller(c(
-               "Clearance"   = "bold(Maximum~clearance~rate~(ml~mgC^-1~h^-1))",
-               "Ingestion"   = "bold(Maximum~ingestion~rate~(mgC~mgC^-1~h^-1))",
-               "Growth"      = "bold(Growth~rate~(mgC~mgC^-1~h^-1))",
-               "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))"
-             ), 
-             label_parsed))+  
-  labs(x = "Size group",
-       y = bquote(bold("Carbon-mass specific Q"[10])),
-       colour = "Size group") +
-  theme(
-    strip.background = element_rect(fill = "whitesmoke", colour = "black"),
-    axis.title = element_text(size = 11, face = "bold"),
-    axis.text = element_text(size = 10),
-    legend.position = "none"
-  )
-zoopGQ10plot
 
+# Growth
+growPlot <- PlotLMM(m_growth, d_growth) + 
+  labs(y = expression(bold("ln(Growth rate (mgC mgC"^-1*" h"^-1*"))"))) +
+  facet_wrap(~zoopGrp, nrow = 1)
+growPlot
+
+
+# Respiration
+respPlot <- PlotLMM(m_respiration, d_respiration) + 
+  labs(y = expression(bold("ln(Respiration rate (" * mu * "LO"[2] * " mgC"^-1 * " h"^-1 * "))"))) +
+  theme(legend.position = "none") +
+  facet_wrap(~zoopGrp, nrow = 1)
+respPlot 
 
 library(patchwork)
 
-tempPlot/funcGQ10plot +
-  plot_layout(guides = "collect") 
+tempPlots <- clearPlot / ingPlot / growPlot / respPlot +
+  plot_layout(guides = "collect")
+tempPlots
+
+
+# Plot zoopGrp Q10s
+# Clearance
+clearQ10plot <- ggplot() +
+  geom_errorbar(data = clearanceQ10, 
+                aes(x = zoopGrp, ymin = Q10_lwr, ymax = Q10_upr, colour = zoopGrp),
+                width = .05,
+                linewidth = 1) +
+  geom_point(data = clearanceQ10, aes(x = zoopGrp, y = Q10),
+             size = 3,
+             colour = "black") +
+  geom_text(data = clearanceQ10,
+            aes(x = zoopGrp, y = Q10, label = sprintf("%.2f", Q10)),
+            nudge_x = 0.25,
+            nudge_y = 0.0) +
+  scale_fill_manual(values = grp_cols) +
+  scale_colour_manual(values = grp_cols) +
+  labs(x = "Taxonomic group",
+       y = bquote(bold("Carbon-mass specific clearance rate Q"[10])),
+       colour = "Taxonomic group") +
+  theme(
+    axis.title = element_text(size = 11, face = "bold"),
+    axis.text = element_text(size = 10),
+    legend.position = "none")
+clearQ10plot
+
+
+# Ingestion
+ingQ10plot <- ggplot() +
+  geom_errorbar(data = ingestionQ10, 
+                aes(x = zoopGrp, ymin = Q10_lwr, ymax = Q10_upr, colour = zoopGrp),
+                width = .05,
+                linewidth = 1) +
+  geom_point(data = ingestionQ10, aes(x = zoopGrp, y = Q10),
+             size = 3,
+             colour = "black") +
+  geom_text(data = ingestionQ10,
+            aes(x = zoopGrp, y = Q10, label = sprintf("%.2f", Q10)),
+            nudge_x = 0.20,
+            nudge_y = 0.0) +
+  scale_fill_manual(values = grp_cols) +
+  scale_colour_manual(values = grp_cols) +
+  labs(x = "Taxonomic group",
+       y = bquote(bold("Carbon-mass specific ingestion rate Q"[10])),
+       colour = "Taxonomic group") +
+  theme(
+    axis.title = element_text(size = 11, face = "bold"),
+    axis.text = element_text(size = 10),
+    legend.position = "none")
+ingQ10plot
+
+
+# Growth
+growQ10plot <- ggplot() +
+  geom_errorbar(data = growthQ10, 
+                aes(x = zoopGrp, ymin = Q10_lwr, ymax = Q10_upr, colour = zoopGrp),
+                width = .05,
+                linewidth = 1) +
+  geom_point(data = growthQ10, aes(x = zoopGrp, y = Q10),
+             size = 3,
+             colour = "black") +
+  geom_text(data = growthQ10,
+            aes(x = zoopGrp, y = Q10, label = sprintf("%.2f", Q10)),
+            nudge_x = 0.40,
+            nudge_y = 0.0) +
+  scale_fill_manual(values = grp_cols) +
+  scale_colour_manual(values = grp_cols) +
+  labs(x = "Taxonomic group",
+       y = bquote(bold("Carbon-mass specific growth rate Q"[10])),
+       colour = "Taxonomic group") +
+  theme(
+    axis.title = element_text(size = 11, face = "bold"),
+    axis.text = element_text(size = 10))
+growQ10plot
+
+
+# Respiration
+respQ10plot <- ggplot() +
+  geom_errorbar(data = respQ10, 
+                aes(x = zoopGrp, ymin = Q10_lwr, ymax = Q10_upr, colour = zoopGrp),
+                width = .05,
+                linewidth = 1) +
+  geom_point(data = respQ10, aes(x = zoopGrp, y = Q10),
+             size = 3,
+             colour = "black") +
+  geom_text(data = respQ10,
+            aes(x = zoopGrp, y = Q10, label = sprintf("%.2f", Q10)),
+            nudge_x = 0.3,
+            nudge_y = 0.0) +
+  scale_fill_manual(values = grp_cols) +
+  scale_colour_manual(values = grp_cols) +
+  labs(x = "Taxonomic group",
+       y = bquote(bold("Carbon-mass specific respiration rate Q"[10])),
+       colour = "Taxonomic group") +
+  theme(
+    axis.title = element_text(size = 11, face = "bold"),
+    axis.text = element_text(size = 10),
+    legend.position = "none")
+respQ10plot
+
+Q10Plots <- 
+  clearQ10plot +
+  ingQ10plot +
+  growQ10plot +
+  respQ10plot +
+  plot_layout(guides = "collect")
+Q10Plots
+
+
+tempPlots  
+Q10Plots 
+
 
 

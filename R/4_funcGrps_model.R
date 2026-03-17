@@ -65,7 +65,7 @@ group_order <- c("Crustaceans",
 
 # Combine them into one dataframe
 usedat <- rbind(cleardat, ingdat, grwdat, respdat) %>% 
-  filter_out(funcGrp == "OTHER" | is.na(temp_C)) %>%  # filter out the size group "OTHER" and remove any NAs in temp_C
+  filter_out(funcGrp == "OTHER" | is.na(temp_C)) %>%  # filter out the functional group "OTHER" and remove any NAs in temp_C
   mutate(funcGrp = fct_relevel(funcGrp, group_order)) # reorder funcGrp
   
 
@@ -138,7 +138,7 @@ summary(mdat)
 
 
 # My main question here is...
-  # How does temperature dependence vary across zooplankton groups for each rate? AND
+  # How does temperature dependence vary across zooplankton func groups for each rate? AND
   # How does temperature dependence vary across rate processes?
 
   # So... I will need to model the logMassSpecificRates as a function of 
@@ -155,7 +155,8 @@ summary(mdat)
 # Fit the models ----
 
 # A complex model with 3 way interactions for temp, funcGrp and rate with random effects
-m1 <- glmmTMB(ln_Cspecific_rate ~ temp_C * rate_name * funcGrp + 
+m1 <- glmmTMB(ln_Cspecific_rate ~ 
+                temp_C * rate_name * funcGrp + # 3-way interaction
                 (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
               dispformula = ~rate_name,
               data = mdat) 
@@ -164,7 +165,7 @@ m1 <- glmmTMB(ln_Cspecific_rate ~ temp_C * rate_name * funcGrp +
   sim <- simulateResiduals(m1)
   plot(sim) # looks pretty good
   summary(m1)
-  # Kind of difficult to interpret I'll fit a simpler model to tease this apart
+  # Kind of difficult to interpret as before...
 
   
 # A simpler model without the 3-way interactions, just 2-way interactions
@@ -180,16 +181,11 @@ m2 <- glmmTMB(ln_Cspecific_rate ~
   sim <- simulateResiduals(m2)
   plot(sim) # Looks fine but seems less scattered compared to m1
   summary(m2)
-  # temp:rate - looks like there is significantly different temp dependence among rates for all zoops
-  # rate:grp - appears to be no signif differences among rates and funcGrp but this doesn't include temperature in the interaction...
-  # my random effects seem to be soaking up a fairly decent amount of variance, though there is less for the slope compared to intercept
 
 
 # m1 but without random slopes, just intercepts
 m3 <- glmmTMB(ln_Cspecific_rate ~ 
-                temp_C * rate_name + # interactions between temp and different rates across all zooplankton
-                temp_C * funcGrp +  # between temp and different funcGrps for all rates
-                rate_name * funcGrp + # between rates and funcGrp 
+                temp_C * rate_name * funcGrp + # 3-way interaction
                 (1 | primRef) + (1 | taxa), # with primRef and taxa as random intercepts
               dispformula = ~rate_name,
               data = mdat) 
@@ -198,18 +194,62 @@ m3 <- glmmTMB(ln_Cspecific_rate ~
   sim <- simulateResiduals(m3)
   plot(sim) # Looks fine but seems less scattered compared to m1
   summary(m3)
-  r.squaredGLMM(m3)
 
-# Check performance of models
-performance::compare_performance(m1, m2, m3)
-# m1 has slightly smaller AIC and BIC
+  
+# m1 but without dispersion submodel
+m4 <- glmmTMB(ln_Cspecific_rate ~ 
+                temp_C * rate_name * funcGrp + # 3-way interaction
+                (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts
+              dispformula = ~1,
+              data = mdat) 
+
+  # Check diagnostics
+  sim <- simulateResiduals(m4)
+  plot(sim) # Looks fine but seems less scattered compared to m1
+  summary(m4)
+  
+# Compare models
+performance::compare_performance(m1, m2, m3, m4)
+# Models are not all mutually nested...we'll just treat AIC/BIC as descriptive...
+
 
 # Likelihood ratios test of the models
-anova(m1, m2, m3)
-# likelihood ratios test shows m2 has significantly more explanatory power than both m1 and m3
-# BIC is also slightly better
-# I will use m2 on the basis of the chisqr test and AIC...
-summary(m2)
+# Refit with REML for valid test on fixed/dispersion and random effect structures
+m1_m1 <- update(m1, REML = FALSE)
+m2_m2 <- update(m2, REML = FALSE)
+m3_m3 <- update(m3, REML = FALSE)
+m4_m4 <- update(m4, REML = FALSE)
+
+anova(m1_m1, m2_m2) # test if the three-way interaction is better than the two-way interaction
+  # m1 with 3-way interaction is slightly better
+
+anova(m1_m1, m4_m4) # test if dispersion submodel is justified
+  # yes, m1 with dispersion structure is better
+
+anova(m1_m1, m3_m3) # test if 3 way interaction with simpler RE structure is better
+  # m1 RE(slope and intercept) structure is better
+
+anova(m1_m1, m2_m2, m3_m3, m4_m4) # although models are not mutally nested, lets look at all models for descriptive purposes
+# we will progress with m1
+summary(m1)
+
+
+# Extract slopes using and calculate Q10 for each funcGrp ----
+funcGrp_slopes <- emtrends(m1, ~ rate_name * funcGrp, var = "temp_C")
+summary(funcGrp_slopes, infer = TRUE) # test whether each slope is different from zero for each zoopGrp
+pairs(funcGrp_slopes, by = "rate_name") # pairwise test whether slopes differ significantly across rate types and grps
+# yes, some slightly significant differences for:
+  # Clearance - crust - gelPreds
+  # Clearance - crust - gelFilter
+  # Growth - crust - gelPreds
+
+# Get Q10
+funcGrp_slopes_Q10 <- as.data.frame(funcGrp_slopes) %>% 
+  mutate(Q10 = exp(10 * temp_C.trend),
+         Q10_lwr = exp(10 * asymp.LCL),
+         Q10_upr = exp(10 * asymp.UCL)) %>% 
+  arrange(rate_name, funcGrp)
+funcGrp_slopes_Q10
 
 
 
@@ -260,8 +300,8 @@ PlotLMM = function(model){
                alpha = 0.2) +
     facet_wrap(~rate_name, scales = "free",
                labeller = as_labeller(c(
-                 "Clearance"   = "bold(Maximum~clearance~rate~(ml~mgC^-1~h^-1))",
-                 "Ingestion"   = "bold(Maximum~ingestion~rate~(mgC~mgC^-1~h^-1))",
+                 "Clearance"   = "bold(Clearance~rate~(ml~mgC^-1~h^-1))",
+                 "Ingestion"   = "bold(Ingestion~rate~(mgC~mgC^-1~h^-1))",
                  "Growth"      = "bold(Growth~rate~(mgC~mgC^-1~h^-1))",
                  "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))"
                ), 
@@ -285,19 +325,8 @@ PlotLMM = function(model){
 
 
 # Plot it
-tempPlot <- PlotLMM(m2)
+tempPlot <- PlotLMM(m1)
 tempPlot
-
-  
-# Extract slopes using and calculate Q10 for each funcGrp
-funcGrp_slopes <- emtrends(m2, ~ rate_name * funcGrp, var = "temp_C")
-
-funcGrp_slopes_Q10 <- as.data.frame(funcGrp_slopes) %>% 
-  mutate(Q10 = exp(10 * temp_C.trend),
-         Q10_lwr = exp(10 * asymp.LCL),
-         Q10_upr = exp(10 * asymp.UCL)) %>% 
-  arrange(rate_name, funcGrp)
-funcGrp_slopes_Q10
 
 
 
@@ -312,20 +341,20 @@ funcGQ10plot <- ggplot() +
              colour = "black") +
   geom_text(data = funcGrp_slopes_Q10,
             aes(x = funcGrp, y = Q10, label = sprintf("%.2f", Q10)),
-            nudge_x = 0.20,
+            nudge_x = 0.3,
             nudge_y = 0.0) +
   facet_wrap(~rate_name, scales = "free",
              labeller = as_labeller(c(
-               "Clearance"   = "bold(Maximum~clearance~rate~(ml~mgC^-1~h^-1))",
-               "Ingestion"   = "bold(Maximum~ingestion~rate~(mgC~mgC^-1~h^-1))",
+               "Clearance"   = "bold(Clearance~rate~(ml~mgC^-1~h^-1))",
+               "Ingestion"   = "bold(Ingestion~rate~(mgC~mgC^-1~h^-1))",
                "Growth"      = "bold(Growth~rate~(mgC~mgC^-1~h^-1))",
                "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))"
              ), 
              label_parsed)) +
   scale_colour_manual(values = grp_cols) +
-  labs(x = "Size group",
+  labs(x = "Functional group",
        y = bquote(bold("Carbon-mass specific Q"[10])),
-       colour = "Size group") +
+       colour = "Functional group") +
   theme(
     strip.background = element_rect(fill = "whitesmoke", colour = "black"),
     axis.title = element_text(size = 11, face = "bold"),
@@ -334,9 +363,19 @@ funcGQ10plot <- ggplot() +
   )
 funcGQ10plot
 
+library(ggbreak) # to break y-axis on massive Q10 variance
+funcG10plot_break <- funcGQ10plot +
+  geom_text(data = filter(funcGrp_slopes_Q10, 
+                          (rate_name == "Ingestion" & Q10_upr > 10) |
+                            (rate_name == "Respiration" & Q10_upr > 10)),
+            aes(x = funcGrp, y = 10, label = paste0("↑ ", round(Q10_upr, 0))),
+            colour = "grey40", size = 4,
+            nudge_x = 0.2) +
+  coord_cartesian(ylim = c(NA, 10))
+
 library(patchwork)
 
-tempPlot/funcGQ10plot +
+tempPlot/funcG10plot_break +
   plot_layout(guides = "collect") 
 
 # Save it

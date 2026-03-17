@@ -179,8 +179,7 @@ summary(m1)
 
 # Extract slopes and calculate Q10 for overall zooplankton ----
 slopes <- emtrends(m1, ~ rate_name, var = "temp_C")
-summary(slopes, infer = TRUE)
-test(slopes) # test whether each slope is different from zero
+summary(slopes, infer = TRUE) # test whether each slope is different from zero for each zoopGrp
   # all except growth
 pairs(slopes) # pairwise test whether slopes differ significantly across rate types
   # only slight difference between clearance and ingestion

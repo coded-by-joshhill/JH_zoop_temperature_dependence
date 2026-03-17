@@ -216,7 +216,7 @@ anova(m1_m1, m4_m4) # test if dispersion submodel is justified
 anova(m1_m1, m3_m3) # test if 3 way interaction with simpler RE structure is better
   # m1 RE structure is better
 
-anova(m1_m1, m2_m2, m3_m3,m4_m4) # although models are not mutally nested, lets look at all models for descriptive purposes
+anova(m1_m1, m2_m2, m3_m3, m4_m4) # although models are not mutally nested, lets look at all models for descriptive purposes
 # likelihood ratios test across the board shows m1 has significantly more explanatory power than other models
 # AIC and BIC is also slightly better
 # I will use m1 on the basis of the chisqr test and AIC...
@@ -226,8 +226,7 @@ summary(m1)
 
 # Extract slopes using and calculate Q10 for each sizeGrp ----
 sizeGrp_slopes <- emtrends(m1, ~ rate_name * sizeGrp, var = "temp_C")
-summary(sizeGrp_slopes, infer = TRUE) 
-test(sizeGrp_slopes) # test whether each slope is different from zero
+summary(sizeGrp_slopes, infer = TRUE) # test whether each slope is different from zero for each zoopGrp
 pairs(sizeGrp_slopes, by = "rate_name") # pairwise test whether slopes differ significantly across rate types and grps
   # yes, some slightly significant differences
 
