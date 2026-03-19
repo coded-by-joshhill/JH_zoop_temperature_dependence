@@ -121,14 +121,14 @@ summarise_taxonomic_coverage <- function(data, dataset_name) {
   coverage <- data %>%
     summarise(
       Dataset    = dataset_name,
-      n_species  = n_distinct(species),
-      n_genera   = n_distinct(genus),
-      n_families = n_distinct(family, na.rm = TRUE),
-      n_orders   = n_distinct(order, na.rm = TRUE),
-      n_classes  = n_distinct(class, na.rm = TRUE),
       n_phylas   = n_distinct(phylum, na.rm = TRUE),
-      n_zoopGrps = n_distinct(zoopGrp, na.rm = TRUE),
-      n_observations = n()
+      n_classes  = n_distinct(class, na.rm = TRUE),
+      n_orders   = n_distinct(order, na.rm = TRUE),
+      n_families = n_distinct(family, na.rm = TRUE),
+      n_genera   = n_distinct(genus),
+      n_species  = n_distinct(species),
+      n_observations = n(),
+      n_records = n_distinct(primRef)
     )
   return(coverage)
 }

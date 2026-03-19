@@ -17,6 +17,7 @@ library(glmmTMB) # for modelling
 library(DHARMa) # for diagnostics
 library(emmeans) # Estimated marginal means
 library(performance)
+library(patchwork)
 theme_set(new = theme_bw())
 
 
@@ -81,13 +82,6 @@ usedat %>%
 # Quickly view distribution of raw Cspecific_rates
 # I will use these to remove extreme outliers, particularly those that don't make biological sense
 usedat %>%
-  # exclude values that are not biologically reasonable or are extreme outliers
-  filter(
-    (rate_name == "Clearance" & Cspecific_rate < 500) |
-    (rate_name == "Ingestion" & Cspecific_rate < 0.15) |
-    (rate_name == "Growth" & Cspecific_rate < 0.075) |
-    (rate_name == "Respiration" & Cspecific_rate < 60)
-  ) %>%
   ggplot() +
   geom_point(aes(x = temp_C, y = Cspecific_rate)) +
   theme_bw() +
@@ -98,13 +92,6 @@ usedat %>%
 
 
 usedat %>%
-  # exclude values that are not biologically reasonable or are extreme outliers
-  filter(
-    (rate_name == "Clearance" & Cspecific_rate < 15000) |
-      (rate_name == "Ingestion" & Cspecific_rate < 0.15) |
-      (rate_name == "Growth" & Cspecific_rate < 0.075) |
-      (rate_name == "Respiration" & Cspecific_rate < 60)
-  ) %>%
   ggplot(aes(x = log(Cspecific_rate))) + # log because we will transform the data for analysis
   geom_histogram(bins = 50, fill = "pink", colour = "grey") +
   theme_bw() +
@@ -140,13 +127,6 @@ summary(mdat)
 # My main question here is...
   # How does temperature dependence vary across zooplankton func groups for each rate? AND
   # How does temperature dependence vary across rate processes?
-
-  # So... I will need to model the logMassSpecificRates as a function of 
-    # temperature, the rate and the groups...
-    # I will need a complex model with interactions to test the difference between the effect of temp on rates and temp on groups.
-
-# My response is log transformed, continuous data and 2 rates are normally distributed and two are slightly left skewed... 
-  # This should be fine to Gaussian but I could also check a Gamma with link = log family on the normal massSpecRate data
 
 # I am also mainly interested in the interactions between at least temp:rate and temp:group
 
@@ -220,11 +200,11 @@ m2_m2 <- update(m2, REML = FALSE)
 m3_m3 <- update(m3, REML = FALSE)
 m4_m4 <- update(m4, REML = FALSE)
 
+anova(m1_m1, m4_m4) # test if dispersion submodel is justified
+# yes, m1 with dispersion structure is better
+
 anova(m1_m1, m2_m2) # test if the three-way interaction is better than the two-way interaction
   # m1 with 3-way interaction is slightly better
-
-anova(m1_m1, m4_m4) # test if dispersion submodel is justified
-  # yes, m1 with dispersion structure is better
 
 anova(m1_m1, m3_m3) # test if 3 way interaction with simpler RE structure is better
   # m1 RE(slope and intercept) structure is better
@@ -256,9 +236,9 @@ funcGrp_slopes_Q10
 # Prep for plotting ----
 
 # Define group colours
-grp_cols <- c("Crustaceans" = "#d7191c",
-              "GelPreds" = "#fdae61",
-              "GelFilter" = "#2c7bb6")
+grp_cols <- c("Crustaceans" = "#0077BB",
+              "GelPreds" = "#EE7733",
+              "GelFilter" = "#009988")
 
 
 # Set min and max temp
@@ -274,9 +254,9 @@ PlotLMM = function(model){
   newdat <- expand.grid(
     temp_C    = temp_seq,
     funcGrp   = unique(mdat$funcGrp), # levels of funcGrp
-    rate_name = unique(mdat$rate_name) # levels of rates
-  )
+    rate_name = unique(mdat$rate_name)) # levels of rates
   
+
   # Zooplankton-level (population) predictions
   pop_preds <- newdat
   pred <- predict(model, newdata = newdat, se.fit = TRUE,
@@ -366,14 +346,14 @@ funcGQ10plot
 library(ggbreak) # to break y-axis on massive Q10 variance
 funcG10plot_break <- funcGQ10plot +
   geom_text(data = filter(funcGrp_slopes_Q10, 
-                          (rate_name == "Ingestion" & Q10_upr > 10) |
-                            (rate_name == "Respiration" & Q10_upr > 10)),
-            aes(x = funcGrp, y = 10, label = paste0("↑ ", round(Q10_upr, 0))),
+                          (rate_name == "Ingestion" & Q10_upr > 8) |
+                          (rate_name == "Respiration" & Q10_upr > 8) |
+                          (rate_name == "Clearance" & Q10_upr > 8)),
+            aes(x = funcGrp, y = 7.85, label = paste0("↑ ", round(Q10_upr, 0))),
             colour = "grey40", size = 4,
-            nudge_x = 0.2) +
-  coord_cartesian(ylim = c(NA, 10))
-
-library(patchwork)
+            nudge_x = 0.3) +
+  coord_cartesian(ylim = c(NA, 8))
+funcG10plot_break
 
 tempPlot/funcG10plot_break +
   plot_layout(guides = "collect") 

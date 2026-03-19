@@ -3,8 +3,7 @@
 # 04/02/26
   
   # Here I read in the data and shapefiles
-  # Plot the feeding rates globally
-  # Plot the decadal observations of experiments
+  # Plot the biological rates globally
   # Plot the number of observations of taxa
 
 

@@ -22,14 +22,16 @@ source("R/0_Helpers.R")
 
 
 # Read in the data ----
-dat <- read_csv("https://www.dropbox.com/scl/fi/itv9vpnu8twxz2fyhmp1u/Resp_dat.csv?rlkey=9fig4vcw2cog4rc4qa6mtj7lj&st=6rhjjioa&dl=1", 
+dat <- read_csv("https://www.dropbox.com/scl/fi/itv9vpnu8twxz2fyhmp1u/Resp_dat.csv?rlkey=9fig4vcw2cog4rc4qa6mtj7lj&st=mhqgpuqj&dl=1", 
                 skip = 1) %>%
   mutate(ref_no = if_else(is.na(ref_no) | ref_no == "", # if the value is NA or empty...
                           paste0("Hill_", row_number()), # apply a unique reference number
                           ref_no), # otherwise keep what is there
          taxa = str_squish(taxa)) %>% # remove extra spaces from taxon names
-  relocate(ref_no, .before = everything()) %>%   # move it before all columns
-  filter_out(data_type == "Mean") # exclude average values
+  relocate(ref_no, .before = everything()) %>% # move it before all columns
+  filter_out(data_type == "Mean") # exclude any mean data
+
+
 glimpse(dat)
 
   
@@ -52,7 +54,7 @@ glimpse(dat)
     group_by(rate_name) %>% 
     distinct(primRef, rate_name) %>% 
     summarise(count = n())
-      # 20 records
+      # 23 records
 
   
 
@@ -284,7 +286,7 @@ glimpse(datFinal)
     group_by(zoopGrp) %>% 
     summarise( 
       temp_range = paste0(min(temp_C), "-", max(temp_C)))
-  # All have sensible ranges for estimating Q10, except for Amphipods
+  # All have sensible ranges for estimating Q10, except for amphipods
 
 # Save as RDS for later use
 # saveRDS(datFinal, "Data/resp_dat.rds")

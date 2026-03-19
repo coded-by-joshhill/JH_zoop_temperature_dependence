@@ -10,6 +10,7 @@
 
 # Packages and helpers ----
 library(tidyverse)
+library(patchwork)
 source("R/0_Helpers.R")
 
 
@@ -18,24 +19,18 @@ source("R/0_Helpers.R")
 clearance <- readRDS("Data/clear_ingest_data.rds") %>% 
   filter(rate_name == "ClearanceRate") 
 
-
 ingestion <- readRDS("Data/clear_ingest_data.rds") %>% 
   filter(rate_name == "IngestionRate") 
 
-
 growth <- readRDS("Data/grwth_dat.rds") 
 
-
 respiration <- readRDS("Data/resp_dat.rds") 
-
 
 # Size groups
 Sgroup_order <- c("Mesoplankton", "Macroplankton")
 
-
 # Functional groups
 Fgroup_order <- c("Crustaceans", "GelPreds", "GelFilter")
-
 
 # Zooplankton groups - simple to complex taxonomy
 Zgroup_order <- c("Ctenophores", "Cnidarians", "Chaetognaths", "Molluscs", 
@@ -48,9 +43,91 @@ mycols <- c("Clearance" = "#66c2a5", "Ingestion" = "#fc8d62", "Growth" = "#8da0c
 
 
 
-# Taxonomic coverage summary ----
+# What proportion of the data is between 0 and 30 degC? ----
+# Quick function to select data across each dataset
+temp_dat_summary <- function(data, dataset_name) {
+  data %>%
+    select(temp_C, Cspecific_rate) %>%
+    mutate(Dataset = dataset_name)
+}
+
+
+# Bind all the data into a tibble
+tempDat_binded <- bind_rows(
+  temp_dat_summary(respiration, "respiration"),
+  temp_dat_summary(growth, "growth"),
+  temp_dat_summary(clearance, "clearance"),
+  temp_dat_summary(ingestion, "ingestion"))
+
+
+# Summarise the data and calculate the proportion of data between 0 and 30 degC
+tempDat_binded %>%
+  distinct(Cspecific_rate, .keep_all = TRUE) %>% 
+  summarise(
+    n_total = n(),
+    n_temp_range = sum(temp_C >= 0 & temp_C <= 30, na.rm = TRUE),
+    prop_temp_range = n_temp_range / n_total * 100)
+# n_total n_temp_range prop_temp_range
+#    2553         2422            94.9
+
+
+
+# What proportion of each dataset had the method report? ----
+# Quick function to select data across each dataset
+food_dat_summary <- function(data, dataset_name) {
+  data %>%
+    select(ref_no, food_type, food_conc, method, locality) %>%
+    mutate(Dataset = dataset_name)
+}
+
+
+# Bind all the data into a tibble
+foodDat_binded <- bind_rows(
+  food_dat_summary(respiration, "respiration"),
+  food_dat_summary(growth, "growth"),
+  food_dat_summary(clearance, "clearance"),
+  food_dat_summary(ingestion, "ingestion"))
+
+
+# Table S1 ----
+# Summarise the experiment method data and calculate the proportions reported and not reported.
+foodDat_binded %>% 
+  mutate(method = if_else(is.na(method), "Not reported", method)) %>%
+  group_by(method) %>%
+  mutate(method = recode(method,
+                         "NA"                   = "Not reported",
+                         "Bottle incubation"              = "Controlled experiment",
+                         "In situ bottle incubation"      = "In situ experiment",
+                         "Meta-analysis"                  = "Not reported",
+                         "Meta analysis"                  = "Not reported",
+                         "Oxygen respirometry"            = "Controlled experiment",
+                         "Water bottle method"            = "Controlled experiment",
+                         "Water bottle"                   = "Controlled experiment",
+                         "Observation chamber"            = "Controlled experiment",
+                         "Plankton kreisel tank"          = "Controlled experiment",
+                         "Mixed diet feeding experiments" = "Controlled experiment",
+                         "Sealed-chamber"                 = "Controlled experiment",
+                         "Respirometer chamber"           = "Controlled experiment",
+                         "Through-flow system"            = "Controlled experiment",
+                         "Feeding tank"                   = "Controlled experiment"
+  )
+  ) %>% 
+  summarise(n = n(), .groups = "drop") %>%
+  mutate(prop_method = n / sum(n) * 100) %>% 
+  arrange(-prop_method) %>% 
+  print(n = "Inf")
+# Table S1 - Proportion of methods used for original data collection
+# method                    n         prop_method
+# Not reported           1768       68.3 
+# Controlled experiment   764       29.5 
+# In situ experiment       56       2.16
+
+
+
+# Table 1 ---
+# Taxonomic coverage summary 
 # Calculate coverage for each dataset
-  # The custom function takes the dataset and assigns a it name, then generates simple summaries
+  # The custom function takes the dataset and assigns a it name, then generates simple taxonomic summaries
 clearance_coverage <- summarise_taxonomic_coverage(clearance, "Clearance")
 ingestion_coverage <- summarise_taxonomic_coverage(ingestion, "Ingestion")
 growth_coverage <- summarise_taxonomic_coverage(growth, "Growth")
@@ -61,18 +138,36 @@ respiration_coverage <- summarise_taxonomic_coverage(respiration, "Respiration")
 taxonomic_coverage <- bind_rows(clearance_coverage, ingestion_coverage, growth_coverage, respiration_coverage)
 taxonomic_coverage
 
+# Table S2
+# Dataset     n_phylas n_classes n_orders n_families n_genera n_species n_observations n_records
+# 1 Clearance          5         8       12         27       35        65            618        64
+# 2 Ingestion          3         5        7         16       21        44            307        43
+# 3 Growth             5         7       16         28       32        48            681        54
+# 4 Respiration        4         7       15         39       55       103            982        19
+
 # number of observations pre-cleaning were... 
 # Clearance   1580
 # Ingestion    471
 # Growth       686
 # Respiration 1036
 
-# Table S1
-# Dataset     n_species n_genera n_families n_orders n_classes n_phylas n_zoopGrps n_observations
-# 1 Clearance          65       35         27       12         8        5          7            618
-# 2 Ingestion          44       21         16        7         5        3          5            307
-# 3 Growth             48       32         28       16         7        5          9            681
-# 4 Respiration       103       55         39       15         7        4          6            982
+allDat <- bind_rows(clearance, ingestion, growth, respiration) %>% 
+  mutate(primRef = factor(primRef))
+
+allDat %>% # How many total unique groups/obs/records are there?
+  distinct(phylum, class, order, family, genus, species, Cspecific_rate, primRef) %>% 
+  summarise(
+    totalPhylum = n_distinct(phylum),
+    totalClass = n_distinct(class),
+    totalOrder = n_distinct(order),
+    totalFamily = n_distinct(family),
+    totalGenera = n_distinct(genus),
+    totalSpecies = n_distinct(species),
+    totalObs = n_distinct(Cspecific_rate),
+    totalRecords = n_distinct(primRef))
+
+# totalPhylum totalClass totalOrder totalFamily totalGenera totalSpecies totalObs totalRecords
+#           5          9         21          54          82          167     2553          138
 
 
 
@@ -323,7 +418,8 @@ ZgrpFreqPlot <- ggplot(all_Zgroups,
     legend.position = "top",
     legend.title = element_text(size = 12, face = "bold"),
     panel.grid.major.y = element_blank(),
-    strip.text = element_text(size = 10, face = "bold")) +
+    strip.text = element_text(size = 10, face = "bold"),
+    strip.background = element_rect(fill = "whitesmoke", colour = "black")) +
   facet_wrap(~ dataset, nrow = 1)
 
 ZgrpFreqPlot
@@ -333,7 +429,6 @@ ggsave("Output/Figure_1_zoopGrps.pdf", ZgrpFreqPlot, width = 160, height = 80, u
 
 
 
-library(patchwork)
 
 # Remove y-axis labels from individual plots
 SgrpFreqPlot_no_y <- SgrpFreqPlot + labs(y = NULL)
@@ -344,95 +439,11 @@ FgrpFreqPlot_no_y <- FgrpFreqPlot + labs(y = NULL)
 Fig1_combined <- SgrpFreqPlot_no_y + FgrpFreqPlot_no_y + ZgrpFreqPlot +
   plot_layout(
     ncol = 1,
-    guides = "collect"
-  ) &
-  theme(legend.position = "none")
+    guides = "collect") &
+  theme(legend.position = "top")
 
 Fig1_combined
 
 ggsave("Output/Figure_1_FreqPlots.pdf", Fig1_combined, width = 180, height = 160, units = "mm", dpi = 300)
-
-
-
-
-# What proportion of the data is between 0 and 30 degC? ----
-# Quick function to select data across each dataset
-temp_dat_summary <- function(data, dataset_name) {
-  data %>%
-    select(temp_C) %>%
-    mutate(Dataset = dataset_name)
-}
-
-
-# Bind all the data into a tibble
-tempDat_binded <- bind_rows(
-  temp_dat_summary(respiration, "respiration"),
-  temp_dat_summary(growth, "growth"),
-  temp_dat_summary(clearance, "clearance"),
-  temp_dat_summary(ingestion, "ingestion"))
-
-
-# Summarise the data and calculate the proportion of data between 0 and 30 degC
-tempDat_binded %>%
-  summarise(
-    n_total = n(),
-    n_temp_range = sum(temp_C >= 0 & temp_C <= 30, na.rm = TRUE),
-    prop_temp_range = n_temp_range / n_total * 100)
-    # n_total n_temp_range prop_temp_range
-    # 2588         2455            94.9
-
-
-
-# What proportion of each dataset had the method report? ----
-# Quick function to select data across each dataset
-food_dat_summary <- function(data, dataset_name) {
-  data %>%
-    select(ref_no, food_type, food_conc, method, locality) %>%
-    mutate(Dataset = dataset_name)
-}
-
-
-# Bind all the data into a tibble
-foodDat_binded <- bind_rows(
-  food_dat_summary(respiration, "respiration"),
-  food_dat_summary(growth, "growth"),
-  food_dat_summary(clearance, "clearance"),
-  food_dat_summary(ingestion, "ingestion"))
-
-
-# Table S1 ----
-# Summarise the experiment method data and calculate the proportions reported and not reported.
-foodDat_binded %>% 
-  mutate(method = if_else(is.na(method), "Not reported", method)) %>%
-  group_by(method) %>%
-  mutate(method = recode(method,
-                    "NA"                   = "Not reported",
-                    "Bottle incubation"              = "Controlled experiment",
-                    "In situ bottle incubation"      = "In situ experiment",
-                    "Meta-analysis"                  = "Not reported",
-                    "Meta analysis"                  = "Not reported",
-                    "Oxygen respirometry"            = "Controlled experiment",
-                    "Water bottle method"            = "Controlled experiment",
-                    "Water bottle"                   = "Controlled experiment",
-                    "Observation chamber"            = "Controlled experiment",
-                    "Plankton kreisel tank"          = "Controlled experiment",
-                    "Mixed diet feeding experiments" = "Controlled experiment",
-                    "Sealed-chamber"                 = "Controlled experiment",
-                    "Respirometer chamber"           = "Controlled experiment",
-                    "Through-flow system"            = "Controlled experiment",
-                    "Feeding tank"                   = "Controlled experiment"
-    )
-  ) %>% 
-  summarise(n = n(), .groups = "drop") %>%
-  mutate(prop_method = n / sum(n) * 100) %>% 
-  arrange(-prop_method) %>% 
-  print(n = "Inf")
-      # Table S1 - Proportion of methods used for original data collection
-      # method                    n         prop_method
-      # Not reported           1768       68.3 
-      # Controlled experiment   764       29.5 
-      # In situ experiment       56       2.16
-
-
 
 

@@ -17,6 +17,7 @@ library(glmmTMB) # for modelling
 library(DHARMa) # for diagnostics
 library(emmeans) # Estimated marginal means
 library(performance)
+library(patchwork)
 theme_set(new = theme_bw())
 
 
@@ -127,13 +128,6 @@ summary(mdat)
   # How does temperature dependence vary across zooplankton groups for each rate? AND
   # How does temperature dependence vary across rate processes?
 
-  # So... I will need to model the logMassSpecificRates as a function of 
-    # temperature, the rate and the groups...
-    # I will need a complex model with interactions to test the difference between the effect of temp on rates and temp on groups.
-
-# My response is log transformed, continuous data and 2 rates are normally distributed and two are slightly left skewed... 
-  # This should be fine to Gaussian but I could also check a Gamma with link = log family on the normal massSpecRate data
-
 # I am also mainly interested in the interactions between at least temp:rate and temp:group
 
 
@@ -207,16 +201,16 @@ m2_m2 <- update(m2, REML = FALSE)
 m3_m3 <- update(m3, REML = FALSE)
 m4_m4 <- update(m4, REML = FALSE)
 
-anova(m1_m1, m2_m2) # test if the three-way interaction is better than the two-way interaction
-  # m1 with 3-way interaction is better
-
 anova(m1_m1, m4_m4) # test if dispersion submodel is justified
   # yes, m1 with dispersion structure is better
+
+anova(m1_m1, m2_m2) # test if the three-way interaction is better than the two-way interaction
+  # m1 with 3-way interaction is better
 
 anova(m1_m1, m3_m3) # test if 3 way interaction with simpler RE structure is better
   # m1 RE structure is better
 
-anova(m1_m1, m2_m2, m3_m3, m4_m4) # although models are not mutally nested, lets look at all models for descriptive purposes
+anova(m1_m1, m2_m2, m3_m3, m4_m4) # although models are not mutually nested, lets look at all models for descriptive purposes
 # likelihood ratios test across the board shows m1 has significantly more explanatory power than other models
 # AIC and BIC is also slightly better
 # I will use m1 on the basis of the chisqr test and AIC...
@@ -244,8 +238,8 @@ sizeGrp_slopes_Q10
 # Prep for plotting ----
 
 # Define group colours
-grp_cols <- c("Mesoplankton" = "#fc8d59",
-              "Macroplankton" = "#91bfdb")
+grp_cols <- c("Mesoplankton" = "#0077BB",
+              "Macroplankton" = "#EE7733")
 
 # Set min and max temp
 minTempC <- min(mdat$temp_C)
@@ -260,9 +254,9 @@ PlotLMM = function(model){
   newdat <- expand.grid(
     temp_C    = temp_seq,
     sizeGrp   = unique(mdat$sizeGrp), # levels of sizeGrp
-    rate_name = unique(mdat$rate_name) # levels of rates
-  )
+    rate_name = unique(mdat$rate_name)) # levels of rates
   
+
   # Zooplankton-level (population) predictions
   pop_preds <- newdat
   pred <- predict(model, newdata = newdat, se.fit = TRUE,
@@ -315,6 +309,12 @@ tempPlot <- PlotLMM(m1)
 tempPlot
 
 
+# Add n to slopes_Q10
+n_obs <- mdat %>%
+  count(rate_name, sizeGrp)
+
+sizeGrp_slopes_Q10 <- sizeGrp_slopes_Q10 %>%
+  left_join(n_obs, by = c("rate_name", "sizeGrp"))
 
 # Plot sizeGrp Q10s
 sizeGQ10plot <- ggplot() +
@@ -336,7 +336,11 @@ sizeGQ10plot <- ggplot() +
   geom_text(data = sizeGrp_slopes_Q10,
             aes(x = sizeGrp, y = Q10, label = sprintf("%.2f", Q10)),
             nudge_x = 0.21,
-            nudge_y = 0.0) +
+            nudge_y = 0.0) + 
+  geom_text(data = sizeGrp_slopes_Q10,
+            aes(x = sizeGrp, y = Q10_lwr, label = paste0("n = ", n)),
+            nudge_y = -0.2,   
+            size = 3.5, colour = "grey40") +
   scale_colour_manual(values = grp_cols, labels = c("Mesoplankton", "Macroplankton")) +
   labs(x = "Size group",
        y = bquote(bold("Carbon-mass specific Q"[10])),
@@ -349,8 +353,6 @@ sizeGQ10plot <- ggplot() +
   )
 sizeGQ10plot
 
-
-library(patchwork)
 
 tempPlot/sizeGQ10plot +
   plot_layout(guides = "collect") 

@@ -27,7 +27,7 @@ dat <- read_csv("https://www.dropbox.com/scl/fi/b1pl3iys1kqtuiwbfd99h/IngClear_d
   mutate(ref_no = paste0("Hill_", row_number()),
          taxa = str_squish(taxa)) %>% # create a unique identifier (e.g., Hill_row#)
   relocate(ref_no, .before = everything()) %>%  # move it before all columns
-  filter_out(data_type == "Mean") # remove any average values from the dataset
+  filter_out(data_type == "Mean")  # remove any average values from the dataset
 glimpse(dat)
 
 
@@ -91,7 +91,7 @@ cMassDat <- dat %>%
   dat %>% group_by(rate_name) %>% 
     summarise(count = n())
     # ClearanceRate   844
-    # IngestionRate   223
+    # IngestionRate   348
 
 
   # Look at all unique ClearanceRate taxon
@@ -120,7 +120,7 @@ cMassDat <- dat %>%
     distinct(primRef, rate_name) %>% 
     summarise(count = n())
       # ClearanceRate    71 records
-      # IngestionRate    43 records
+      # IngestionRate    48 records
 
   
 
@@ -225,9 +225,6 @@ datClean <- dat %>%
     relocate(funcGrp, .before = zoopGrp) %>% 
     relocate(sizeGrp, .before = funcGrp)
 
-  
-  
-
 # End data cleaning ----
     
   
@@ -288,7 +285,7 @@ glimpse(datFinal)
     ggplot() + 
     geom_point(aes(x = temp_C, 
                    y = Cspecific_rate, 
-                   colour = primRef)) +
+                   colour = sizeGrp)) +
     facet_wrap(~ rate_name, scales ="free")
   
   
@@ -365,12 +362,13 @@ glimpse(datFinal)
     mutate(countZGrp = sum(zoopGrp > 1, na.rm = TRUE)) %>% 
     distinct(zoopGrp, countZGrp) %>% 
     arrange(countZGrp)
+    # Ctenophores              1
     # Appendicularians         5
     # Cnidarians               6
-    # Euphausiids              8
-    # Chaetognaths            12
+    # Euphausiids             63
+    # Chaetognaths            74
     # Thaliaceans             81
-    # Copepods               111
+    # Copepods               118
 
 
   # Count unique functional groups rates for IngestionRate
@@ -380,9 +378,9 @@ glimpse(datFinal)
     mutate(countFuncGrp = sum(funcGrp > 1, na.rm = TRUE)) %>% 
     distinct(funcGrp, countFuncGrp) %>% 
     arrange(countFuncGrp)
-    # GelPreds              18
+    # GelPreds              81
     # GelFilter             86
-    # Crustaceans          119
+    # Crustaceans          181
 
 
   # Count unique size groups rates for IngestionRate
@@ -392,8 +390,8 @@ glimpse(datFinal)
     mutate(countSizeGrp = sum(sizeGrp > 1, na.rm = TRUE)) %>% 
     distinct(sizeGrp, countSizeGrp) %>% 
     arrange(countSizeGrp)
-    # Macroplankton           95
-    # Mesoplankton           128
+    # Macroplankton          151
+    # Mesoplankton           197
 
 
   # Check the temperature range for each zoopGrp
@@ -407,5 +405,5 @@ glimpse(datFinal)
 
   
 # Save it as an RDS for later use
-# saveRDS(datFinal, "Data/clear_ingest_data.rds")
+saveRDS(datFinal, "Data/clear_ingest_data.rds")
 

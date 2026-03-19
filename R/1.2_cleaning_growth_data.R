@@ -76,7 +76,8 @@ dat <- read_csv("https://www.dropbox.com/scl/fi/gdllcg9d1dx1dzf38pckd/Grwth_dat.
                           ref_no), # otherwise keep what is there
          taxa = str_squish(taxa)) %>% # remove extra spaces from taxon names
   relocate(ref_no, .before = everything()) %>%   # move it before all columns
-  filter_out(data_type == "Mean")
+  filter_out(data_type == "Mean") # exclude any mean data
+
 glimpse(dat)
 
   

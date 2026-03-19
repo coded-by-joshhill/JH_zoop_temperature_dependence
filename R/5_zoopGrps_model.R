@@ -17,6 +17,7 @@ library(glmmTMB) # for modelling
 library(DHARMa) # for diagnostics
 library(emmeans) # Estimated marginal means
 library(performance)
+library(patchwork)
 theme_set(new = theme_bw())
 
 
@@ -90,7 +91,7 @@ usedat %>%
   # Growth:
     # won't be able to get estimates for mysids
   # Respiration:
-    # wont be able to get estimates for amphipods, decapods
+    # wont be able to get estimates for amphipods, decapods, mysids, annelids, molluscs
 
 
 # Quickly view distribution of raw Cspecific_rates
@@ -120,6 +121,10 @@ usedat %>%
 
 # Prep data for modelling ----
 mdat <- usedat %>%
+  group_by(zoopGrp, rate_name) %>% 
+  filter(n() >= 15, # Exclude zoopGrp that don't have suitable data or temp ranges
+         max(temp_C) - min(temp_C) >= 5) %>% 
+  ungroup() %>% 
   mutate(ln_Cspecific_rate = log(Cspecific_rate)) # log transform mass-specific rate
 
 
@@ -137,13 +142,6 @@ summary(mdat)
 # My main question here is...
   # How does temperature dependence vary across zooplankton groups for each rate? AND
   # How does temperature dependence vary across rate processes?
-
-  # So... I will need to model the logMassSpecificRates as a function of 
-    # temperature, the rate and the groups...
-    # I will need a complex model with interactions to test the difference between the effect of temp on rates and temp on groups.
-
-# My response is log transformed, continuous data and 2 rates are normally distributed and two are slightly left skewed... 
-  # This should be fine to Gaussian but I could also check a Gamma with link = log family on the normal massSpecRate data
 
 # I am also mainly interested in the interactions between at least temp:rate and temp:group
 
@@ -178,30 +176,24 @@ m1 <- glmmTMB(ln_Cspecific_rate ~
 mdat %>%
   count(rate_name, zoopGrp) %>%
   pivot_wider(names_from = zoopGrp, values_from = n, values_fill = 0)
-  # 13 rate to group combinations lacking data to estimate coefficients
+  # 12 rate to group combinations lacking data to estimate coefficients
 
 # Because there are many zeros across the groups and rates...I will fit per-rate models to estimate temperature dependence for available groups
 
   
+
 # Per-rate models ----
 m2 <- mdat %>% # using my model data
   group_by(rate_name) %>% # group by each rate 
-  nest() %>% 
-  mutate(data = map2(data, rate_name, \(d, r) {
-    d %>%
-      group_by(zoopGrp) %>%
-      filter(n() >= 15, # drop groups with < 15 obs for this rate
-             max(temp_C) - min(temp_C) >= 5) %>% # drop groups with insufficient temperature range
-      ungroup() %>%
-      droplevels() # remove empty factor levels so glmmTMB doesn't see them
-    }),
-    fit = map(data, \(d) glmmTMB( # fit a glmmTMB to each rate 
-      ln_Cspecific_rate ~ # log(mass-specific rate) as a function of...
-        temp_C * zoopGrp + # temp and different zoopGrps (2-way interaction) for each rate
-        (1 | primRef) + (1 | taxa), # with primRef and taxa as random intercepts - not enough data to include random slopes
-      data = d,
-      family = gaussian() # use gaussian for now, we can update each model afterwards
-      )))
+  nest() %>% # nest each rate into their own tibbles
+  mutate(
+    fit = map(data, \(data) glmmTMB(
+      ln_Cspecific_rate ~ 
+        temp_C * zoopGrp + # two-way interaction between temp and zooplankton group
+        (1 | primRef) + (1 | taxa), # random intercepts only - insufficient data for random slopes
+      dispformula = ~1,
+      data = data # use the nested rate-specific data slice
+    )))
 
 
 # Extract each model using the name
@@ -221,14 +213,10 @@ d_respiration <- m2$data[m2$rate_name == "Respiration"][[1]]
 # Clearance
 sim <- simulateResiduals(m_clearance)
 plot(sim) # doesn't look great
-plotResiduals(sim, form = d_clearance$zoopGrp)
-plotResiduals(sim, form = d_clearance$temp_C)
 # Let's update the model with a dispersion formula to try improve heteroscedasticity
 m_clearance2 <- update(m_clearance, dispformula = ~zoopGrp, data = d_clearance)
 sim <- simulateResiduals(m_clearance2)
 plot(sim) 
-plotResiduals(sim, form = d_clearance$zoopGrp)
-plotResiduals(sim, form = d_clearance$temp_C)
 # doesn't seem to have improved anything, we will stick with the first model and accept this as a limitation instead of overfitting this data
 summary(m_clearance)
 
@@ -285,13 +273,10 @@ ingestionQ10
 # Growth
 growth_slopes <- emtrends(m_growth, ~zoopGrp, var = "temp_C")
 summary(growth_slopes, infer = TRUE)# test whether each slope is different from zero for each zoopGrp
-pairs(growth_slopes) %>%
-  as.data.frame() %>%
-  mutate(sig = case_when(
-    p.value < 0.001 ~ "***",
-    p.value < 0.01  ~ "**",
-    p.value < 0.05  ~ "*",
-    TRUE            ~ "ns"))
+pairs(growth_slopes)
+  # ctenophores - copepods
+  # cnidarians - copepods
+  # chaetognaths - copepods
 
 growthQ10 <- as.data.frame(growth_slopes) %>% 
   mutate(Q10 = exp(10 * temp_C.trend),
@@ -303,13 +288,10 @@ growthQ10
 # Respiration
 resp_slopes <- emtrends(m_respiration, ~zoopGrp, var = "temp_C")
 summary(resp_slopes, infer = TRUE) # test whether each slope is different from zero for each zoopGrp
-pairs(resp_slopes) %>%
-  as.data.frame() %>%
-  mutate(sig = case_when(
-    p.value < 0.001 ~ "***",
-    p.value < 0.01  ~ "**",
-    p.value < 0.05  ~ "*",
-    TRUE            ~ "ns"))
+pairs(resp_slopes)
+  # ctenophores - cnidarians
+  # cnidarians- copepods
+  # 
 
 respQ10 <- as.data.frame(resp_slopes) %>% 
   mutate(Q10 = exp(10 * temp_C.trend),
@@ -328,20 +310,17 @@ summary(m_respiration)
 
 # Prep for plotting ----
 
-# Update mdat
-mdat <- bind_rows(m_clearance, m_ingestion, m_growth, m_respiration)
-mdat %>% distinct(zoopGrp)
-
 # Define group colours
 grp_cols <- c(
-  "Ctenophores" = "#F8766D",
-  "Cnidarians"  = "#CD9600",
-  "Chaetognaths"= "#7CAE00",
-  "Amphipods"   = "#00BE67",
-  "Copepods"    = "#00BFC4",
-  "Decapods"    = "#00A9FF",
-  "Euphausiids" = "#C77CFF",
-  "Thaliaceans" = "#FF61CC")
+  "Ctenophores"  = "#E69F00",  # orange
+  "Cnidarians"   = "#56B4E9",  # sky blue
+  "Chaetognaths" = "#009E73",  # green
+  "Amphipods"    = "#F0E442",  # yellow
+  "Copepods"     = "#0072B2",  # dark blue
+  "Decapods"     = "#D55E00",  # vermillion
+  "Euphausiids"  = "#CC79A7",  # pink
+  "Thaliaceans"  = "#000000")   # black
+
 
 
 # Set min and max temp
@@ -357,9 +336,9 @@ PlotLMM = function(model, data){
   # Build newdata grid manually
   newdat <- expand.grid(
     temp_C    = temp_seq,
-    zoopGrp   = unique(data$zoopGrp) # levels of zoopGrp
-  )
+    zoopGrp   = unique(data$zoopGrp)) # levels of zoopGrp
   
+
   # Zooplankton-level (population) predictions
   pop_preds <- newdat
   pred <- predict(model, newdata = newdat, se.fit = TRUE,
@@ -402,7 +381,7 @@ PlotLMM = function(model, data){
 # Plot it
 # Clearance
 clearPlot <- PlotLMM(m_clearance, d_clearance) + 
-  labs(y = expression(bold("ln(Clearance rate (ml mgC"^-1*" h"^-1*"))"))) +
+  labs(y = expression(bold("ln (Clearance rate (ml mgC"^-1*" h"^-1*"))"))) +
   theme(legend.position = "none") +
   facet_wrap(~zoopGrp, nrow = 1)
 clearPlot
@@ -410,7 +389,7 @@ clearPlot
 
 # Ingestion
 ingPlot <- PlotLMM(m_ingestion, d_ingestion) + 
-  labs(y = expression(bold("ln(Ingestion rate (mgC mgC"^-1*" h"^-1*"))"))) +
+  labs(y = expression(bold("ln (Ingestion rate (mgC mgC"^-1*" h"^-1*"))"))) +
   theme(legend.position = "none") +
   facet_wrap(~zoopGrp, nrow = 1)
 ingPlot
@@ -418,22 +397,20 @@ ingPlot
 
 # Growth
 growPlot <- PlotLMM(m_growth, d_growth) + 
-  labs(y = expression(bold("ln(Growth rate (mgC mgC"^-1*" h"^-1*"))"))) +
-  facet_wrap(~zoopGrp, nrow = 1)
+  labs(y = expression(bold("ln (Growth rate (mgC mgC"^-1*" h"^-1*"))"))) +
+  facet_wrap(~zoopGrp, nrow = 2)
 growPlot
 
 
 # Respiration
 respPlot <- PlotLMM(m_respiration, d_respiration) + 
-  labs(y = expression(bold("ln(Respiration rate (" * mu * "LO"[2] * " mgC"^-1 * " h"^-1 * "))"))) +
+  labs(y = expression(bold("ln (Respiration rate (" * mu * "LO"[2] * " mgC"^-1 * " h"^-1 * "))"))) +
   theme(legend.position = "none") +
   facet_wrap(~zoopGrp, nrow = 1)
 respPlot 
 
-library(patchwork)
-
-tempPlots <- clearPlot / ingPlot / growPlot / respPlot +
-  plot_layout(guides = "collect")
+tempPlots <- clearPlot / ingPlot / growPlot / respPlot + 
+  plot_layout(guides = "collect", heights = c(1, 1, 2, 1)) # adjust relative heights here
 tempPlots
 
 
@@ -459,6 +436,7 @@ clearQ10plot <- ggplot() +
   theme(
     axis.title = element_text(size = 11, face = "bold"),
     axis.text = element_text(size = 10),
+    axis.text.x = element_text(angle = 45, hjust = 1),
     legend.position = "none")
 clearQ10plot
 
@@ -484,6 +462,7 @@ ingQ10plot <- ggplot() +
   theme(
     axis.title = element_text(size = 11, face = "bold"),
     axis.text = element_text(size = 10),
+    axis.text.x = element_text(angle = 45, hjust = 1),
     legend.position = "none")
 ingQ10plot
 
@@ -499,7 +478,7 @@ growQ10plot <- ggplot() +
              colour = "black") +
   geom_text(data = growthQ10,
             aes(x = zoopGrp, y = Q10, label = sprintf("%.2f", Q10)),
-            nudge_x = 0.40,
+            nudge_x = 0.35,
             nudge_y = 0.0) +
   scale_fill_manual(values = grp_cols) +
   scale_colour_manual(values = grp_cols) +
@@ -508,7 +487,8 @@ growQ10plot <- ggplot() +
        colour = "Taxonomic group") +
   theme(
     axis.title = element_text(size = 11, face = "bold"),
-    axis.text = element_text(size = 10))
+    axis.text = element_text(size = 10),
+    axis.text.x = element_text(angle = 45, hjust = 1))
 growQ10plot
 
 
@@ -533,8 +513,10 @@ respQ10plot <- ggplot() +
   theme(
     axis.title = element_text(size = 11, face = "bold"),
     axis.text = element_text(size = 10),
+    axis.text.x = element_text(angle = 45, hjust = 1),
     legend.position = "none")
 respQ10plot
+
 
 Q10Plots <- 
   clearQ10plot +

@@ -17,6 +17,7 @@ library(glmmTMB) # for modelling
 library(DHARMa) # for diagnostics
 library(emmeans) # Estimated marginal means
 library(performance)
+library(patchwork)
 theme_set(new = theme_bw())
 
 
@@ -168,11 +169,12 @@ m1_m1 <- update(m1, REML = FALSE)
 m2_m2 <- update(m2, REML = FALSE)
 m3_m3 <- update(m3, REML = FALSE)
 
+anova(m1_m1, m3_m3) # test if dispersion submodel is justified
+  # m1 is still best fit, dispersion submodel is improving my explanatory power here
+
 anova(m1_m1, m2_m2) # test which random effects structure is a better fit
   # m1 is better
 
-anova(m1_m1, m3_m3) # test if dispersion submodel is justified
-  # m1 is still best fit, dispersion submodel is improving my explanatory power here
 # we will proceed with m1 on the basis of AIC, BIC and likelihood ratio tests
 summary(m1)
 
@@ -182,15 +184,21 @@ slopes <- emtrends(m1, ~ rate_name, var = "temp_C")
 summary(slopes, infer = TRUE) # test whether each slope is different from zero for each zoopGrp
   # all except growth
 pairs(slopes) # pairwise test whether slopes differ significantly across rate types
-  # only slight difference between clearance and ingestion
-  # no significant difference between clearance and respiration
-  # no significant difference between ingestion and respiration
+  # slight difference between clearance-ingestion
+  # clearance - growth
+  # ingestion - growth
+  # growth - respiration
+
+# Get n_obs
+n_obs <- mdat %>%
+  count(rate_name)
 
 # Get Q10
 slopes_Q10 <- as.data.frame(slopes) %>% 
-  mutate(Q10 = exp(10* temp_C.trend),
-         Q10_lwr = exp(10 * asymp.LCL),
-         Q10_upr = exp(10 * asymp.UCL))
+  mutate(Q10 = round(exp(10* temp_C.trend), digits = 2),
+         Q10_lwr = round(exp(10 * asymp.LCL), digits = 2),
+         Q10_upr = round(exp(10 * asymp.UCL), digits = 2)) %>% 
+  left_join(n_obs, by = "rate_name")
 slopes_Q10
 
 
@@ -210,9 +218,9 @@ PlotLMM = function(model){
   # Build newdata grid manually
   newdat <- expand.grid(
     temp_C    = temp_seq,
-    rate_name = unique(mdat$rate_name) # levels of rates
-  )
-  
+    rate_name = unique(mdat$rate_name)) # levels of rates
+
+
   # Zooplankton-level (population) predictions
   pop_preds <- newdat
   pred <- predict(model, newdata = newdat, se.fit = TRUE,
@@ -245,7 +253,7 @@ PlotLMM = function(model){
                label_parsed))+ 
     coord_cartesian(xlim = c(-2, 32)) +
     labs(x = "Temp (°C)",
-         y = "ln(Carbon-mass specific rate)") +
+         y = "ln (Carbon-mass specific rate)") +
     theme_bw() +
     theme(
       strip.background = element_rect(fill = "whitesmoke", colour = "black"),
@@ -276,15 +284,19 @@ rate_cols <- c("Clearance"   = "#66c2a5",
 allZoopQ10plot <- ggplot() +
   geom_errorbar(data = slopes_Q10, 
                 aes(x = rate_name, ymin = Q10_lwr, ymax = Q10_upr), 
-                colour = "darkgray",
+                colour = "grey",
                 width = 0.05, linewidth = 1) +
   geom_point(data = slopes_Q10, 
-             aes(x = rate_name, y = Q10, fill = rate_name),
-             size = 4, colour = "black", shape = 21) +
+             aes(x = rate_name, y = Q10),
+             size = 4, colour = "midnightblue") +
   geom_text(data = slopes_Q10,
             aes(x = rate_name, y = Q10, label = sprintf("%.2f", Q10)),
             nudge_x = 0.22,
             nudge_y = 0.01) +
+  geom_text(data = slopes_Q10,
+            aes(x = rate_name, y = Q10_lwr, label = paste0("n = ", n)),
+            nudge_y = -0.3,   
+            size = 3.5, colour = "grey40") +
   scale_fill_manual(values = rate_cols, guide = "none") +
   labs(x = "Biological rate process",
        y = bquote(bold("Carbon-mass specific Q"[10]))) +
@@ -295,8 +307,6 @@ allZoopQ10plot <- ggplot() +
 
 allZoopQ10plot
 
-
-library(patchwork)
 
 fig2 <- tempPlot/allZoopQ10plot +
   plot_layout(guides = "collect")
