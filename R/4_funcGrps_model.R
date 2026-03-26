@@ -138,7 +138,6 @@ summary(mdat)
 m1 <- glmmTMB(ln_Cspecific_rate ~ 
                 temp_C * rate_name * funcGrp + # 3-way interaction
                 (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
-              dispformula = ~rate_name,
               data = mdat) 
 
   # Check diagnostics
@@ -154,7 +153,6 @@ m2 <- glmmTMB(ln_Cspecific_rate ~
                 temp_C * funcGrp +  # between temp and different funcGrps for all rates
                 rate_name * funcGrp + # between rates and funcGrp 
                 (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
-              dispformula = ~rate_name,
               data = mdat) 
 
   # Check diagnostics
@@ -167,7 +165,6 @@ m2 <- glmmTMB(ln_Cspecific_rate ~
 m3 <- glmmTMB(ln_Cspecific_rate ~ 
                 temp_C * rate_name * funcGrp + # 3-way interaction
                 (1 | primRef) + (1 | taxa), # with primRef and taxa as random intercepts
-              dispformula = ~rate_name,
               data = mdat) 
 
   # Check diagnostics
@@ -176,20 +173,8 @@ m3 <- glmmTMB(ln_Cspecific_rate ~
   summary(m3)
 
   
-# m1 but without dispersion submodel
-m4 <- glmmTMB(ln_Cspecific_rate ~ 
-                temp_C * rate_name * funcGrp + # 3-way interaction
-                (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts
-              dispformula = ~1,
-              data = mdat) 
-
-  # Check diagnostics
-  sim <- simulateResiduals(m4)
-  plot(sim) # Looks fine but seems less scattered compared to m1
-  summary(m4)
-  
 # Compare models
-performance::compare_performance(m1, m2, m3, m4)
+performance::compare_performance(m1, m2, m3)
 # Models are not all mutually nested...we'll just treat AIC/BIC as descriptive...
 
 
@@ -198,10 +183,6 @@ performance::compare_performance(m1, m2, m3, m4)
 m1_m1 <- update(m1, REML = FALSE)
 m2_m2 <- update(m2, REML = FALSE)
 m3_m3 <- update(m3, REML = FALSE)
-m4_m4 <- update(m4, REML = FALSE)
-
-anova(m1_m1, m4_m4) # test if dispersion submodel is justified
-# yes, m1 with dispersion structure is better
 
 anova(m1_m1, m2_m2) # test if the three-way interaction is better than the two-way interaction
   # m1 with 3-way interaction is slightly better
@@ -209,7 +190,7 @@ anova(m1_m1, m2_m2) # test if the three-way interaction is better than the two-w
 anova(m1_m1, m3_m3) # test if 3 way interaction with simpler RE structure is better
   # m1 RE(slope and intercept) structure is better
 
-anova(m1_m1, m2_m2, m3_m3, m4_m4) # although models are not mutally nested, lets look at all models for descriptive purposes
+anova(m1_m1, m2_m2, m3_m3) # although models are not mutally nested, lets look at all models for descriptive purposes
 # we will progress with m1
 summary(m1)
 
@@ -223,11 +204,16 @@ pairs(funcGrp_slopes, by = "rate_name") # pairwise test whether slopes differ si
   # Clearance - crust - gelFilter
   # Growth - crust - gelPreds
 
+# Get n
+n_obs <- mdat %>%
+  count(rate_name, funcGrp)
+
 # Get Q10
 funcGrp_slopes_Q10 <- as.data.frame(funcGrp_slopes) %>% 
-  mutate(Q10 = exp(10 * temp_C.trend),
-         Q10_lwr = exp(10 * asymp.LCL),
-         Q10_upr = exp(10 * asymp.UCL)) %>% 
+  mutate(Q10 = round(exp(10* temp_C.trend), digits = 2),
+         Q10_lwr = round(exp(10 * asymp.LCL), digits = 2),
+         Q10_upr = round(exp(10 * asymp.UCL), digits = 2)) %>% 
+  left_join(n_obs, by = c("rate_name", "funcGrp")) %>% 
   arrange(rate_name, funcGrp)
 funcGrp_slopes_Q10
 
@@ -298,10 +284,10 @@ PlotLMM = function(model){
       strip.background = element_rect(fill = "whitesmoke", colour = "black"),
       axis.title = element_text(size = 11, face = "bold"),
       axis.text = element_text(size = 10),
-      legend.title = element_text(size = 10, face = "bold")
+      legend.title = element_text(size = 10, face = "bold"),
+      legend.position = "top"
     )
 }
-
 
 
 # Plot it
@@ -309,12 +295,11 @@ tempPlot <- PlotLMM(m1)
 tempPlot
 
 
-
 # Plot funcGrp Q10s
 funcGQ10plot <- ggplot() +
   geom_errorbar(data = funcGrp_slopes_Q10, 
                 aes(x = funcGrp, ymin = Q10_lwr, ymax = Q10_upr, colour = funcGrp),
-                width = .05,
+                width = .09,
                 linewidth = 1) +
   geom_point(data = funcGrp_slopes_Q10, aes(x = funcGrp, y = Q10),
              size = 3,
@@ -322,7 +307,11 @@ funcGQ10plot <- ggplot() +
   geom_text(data = funcGrp_slopes_Q10,
             aes(x = funcGrp, y = Q10, label = sprintf("%.2f", Q10)),
             nudge_x = 0.3,
-            nudge_y = 0.0) +
+            nudge_y = -0.0) +
+  geom_text(data = funcGrp_slopes_Q10,
+            aes(x = funcGrp, y = Q10_lwr, label = paste0("n = ", n)),
+            nudge_y = -0.3,   
+            size = 3.5, colour = "grey40") +
   facet_wrap(~rate_name, scales = "free",
              labeller = as_labeller(c(
                "Clearance"   = "bold(Clearance~rate~(ml~mgC^-1~h^-1))",
@@ -352,13 +341,12 @@ funcG10plot_break <- funcGQ10plot +
             aes(x = funcGrp, y = 7.85, label = paste0("↑ ", round(Q10_upr, 0))),
             colour = "grey40", size = 4,
             nudge_x = 0.3) +
-  coord_cartesian(ylim = c(NA, 8))
+  coord_cartesian(ylim = c(-1, 8))
 funcG10plot_break
 
-tempPlot/funcG10plot_break +
-  plot_layout(guides = "collect") 
+tempPlot/funcG10plot_break
 
 # Save it
 ggsave("Output/Figure4/Figure4_tempPlot.pdf", tempPlot, width = 160, height = 150, units = "mm", dpi = 300)
-ggsave("Output/Figure4/Figure4_Q10Plot.pdf", funcGQ10plot, width = 160, height = 70, units = "mm", dpi = 300)
+ggsave("Output/Figure4/Figure4_Q10Plot.pdf", funcG10plot_break, width = 160, height = 120, units = "mm", dpi = 300)
 

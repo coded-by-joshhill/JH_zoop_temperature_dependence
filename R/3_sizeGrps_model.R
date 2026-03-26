@@ -138,7 +138,6 @@ summary(mdat)
 m1 <- glmmTMB(ln_Cspecific_rate ~ 
                 temp_C * rate_name * sizeGrp + # three-way interaction
                 (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
-              dispformula = ~rate_name,
               data = mdat) 
 
   # Check diagnostics
@@ -154,7 +153,6 @@ m2 <- glmmTMB(ln_Cspecific_rate ~
                 temp_C * sizeGrp +  # between temp and different sizeGrps for all rates
                 rate_name * sizeGrp + # between rates and sizeGrp 
                 (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
-              dispformula = ~rate_name,
               data = mdat) 
 
   # Check diagnostics
@@ -167,30 +165,16 @@ m2 <- glmmTMB(ln_Cspecific_rate ~
 m3 <- glmmTMB(ln_Cspecific_rate ~ 
                 temp_C * rate_name * sizeGrp + # three-way interaction
                 (1 | primRef) + (1 | taxa), # with primRef and taxa as random intercepts
-              dispformula = ~rate_name,
               data = mdat) 
 
   # Check diagnostics
   sim <- simulateResiduals(m3)
   plot(sim) # Looks fine but seems less scattered compared to m1
   summary(m3)
+
   
-
-# m1 but without dispersion model, including
-m4 <- glmmTMB(ln_Cspecific_rate ~ 
-                temp_C * rate_name * sizeGrp + # three-way interaction
-                (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
-              dispformula = ~1,
-              data = mdat) 
-
-  # Check diagnostics
-  sim <- simulateResiduals(m4)
-  plot(sim) # Looks fine but seems less scattered compared to m1
-  summary(m4)
-  
-
 # Compare models
-performance::compare_performance(m1, m2, m3, m4)
+performance::compare_performance(m1, m2, m3)
 # Models are not all mutually nested...we'll just treat AIC/BIC as descriptive...
 
 
@@ -199,10 +183,6 @@ performance::compare_performance(m1, m2, m3, m4)
 m1_m1 <- update(m1, REML = FALSE)
 m2_m2 <- update(m2, REML = FALSE)
 m3_m3 <- update(m3, REML = FALSE)
-m4_m4 <- update(m4, REML = FALSE)
-
-anova(m1_m1, m4_m4) # test if dispersion submodel is justified
-  # yes, m1 with dispersion structure is better
 
 anova(m1_m1, m2_m2) # test if the three-way interaction is better than the two-way interaction
   # m1 with 3-way interaction is better
@@ -210,7 +190,7 @@ anova(m1_m1, m2_m2) # test if the three-way interaction is better than the two-w
 anova(m1_m1, m3_m3) # test if 3 way interaction with simpler RE structure is better
   # m1 RE structure is better
 
-anova(m1_m1, m2_m2, m3_m3, m4_m4) # although models are not mutually nested, lets look at all models for descriptive purposes
+anova(m1_m1, m2_m2, m3_m3) # although models are not mutually nested, lets look at all models for descriptive purposes
 # likelihood ratios test across the board shows m1 has significantly more explanatory power than other models
 # AIC and BIC is also slightly better
 # I will use m1 on the basis of the chisqr test and AIC...
@@ -224,11 +204,16 @@ summary(sizeGrp_slopes, infer = TRUE) # test whether each slope is different fro
 pairs(sizeGrp_slopes, by = "rate_name") # pairwise test whether slopes differ significantly across rate types and grps
   # yes, some slightly significant differences
 
+# Get n
+n_obs <- mdat %>%
+  count(rate_name, sizeGrp)
+
 # Get Q10
 sizeGrp_slopes_Q10 <- as.data.frame(sizeGrp_slopes) %>% 
-  mutate(Q10 = exp(10 * temp_C.trend),
-         Q10_lwr = exp(10 * asymp.LCL),
-         Q10_upr = exp(10 * asymp.UCL)) %>% 
+  mutate(Q10 = round(exp(10* temp_C.trend), digits = 2),
+         Q10_lwr = round(exp(10 * asymp.LCL), digits = 2),
+         Q10_upr = round(exp(10 * asymp.UCL), digits = 2)) %>% 
+  left_join(n_obs, by = c("rate_name", "sizeGrp")) %>% 
   arrange(rate_name, sizeGrp)
 sizeGrp_slopes_Q10
 
@@ -298,7 +283,8 @@ PlotLMM = function(model){
       strip.background = element_rect(fill = "whitesmoke", colour = "black"),
       axis.title = element_text(size = 11, face = "bold"),
       axis.text = element_text(size = 10),
-      legend.title = element_text(size = 10, face = "bold")
+      legend.title = element_text(size = 10, face = "bold"),
+      legend.position = "top",
     )
 }
 
@@ -309,13 +295,6 @@ tempPlot <- PlotLMM(m1)
 tempPlot
 
 
-# Add n to slopes_Q10
-n_obs <- mdat %>%
-  count(rate_name, sizeGrp)
-
-sizeGrp_slopes_Q10 <- sizeGrp_slopes_Q10 %>%
-  left_join(n_obs, by = c("rate_name", "sizeGrp"))
-
 # Plot sizeGrp Q10s
 sizeGQ10plot <- ggplot() +
   geom_errorbar(data = sizeGrp_slopes_Q10, 
@@ -325,6 +304,14 @@ sizeGQ10plot <- ggplot() +
   geom_point(data = sizeGrp_slopes_Q10, aes(x = sizeGrp, y = Q10),
              size = 3,
              colour = "black") +
+  geom_text(data = sizeGrp_slopes_Q10,
+            aes(x = sizeGrp, y = Q10, label = sprintf("%.2f", Q10)),
+            nudge_x = 0.21,
+            nudge_y = 0.0) + 
+  geom_text(data = sizeGrp_slopes_Q10,
+            aes(x = sizeGrp, y = Q10_lwr, label = paste0("n = ", n)),
+            nudge_y = -0.3,   
+            size = 3.5, colour = "grey40") +
   facet_wrap(~rate_name, scales = "free",
              labeller = as_labeller(c(
                "Clearance"   = "bold(Clearance~rate~(ml~mgC^-1~h^-1))",
@@ -333,14 +320,6 @@ sizeGQ10plot <- ggplot() +
                "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))"
              ), 
              label_parsed)) + 
-  geom_text(data = sizeGrp_slopes_Q10,
-            aes(x = sizeGrp, y = Q10, label = sprintf("%.2f", Q10)),
-            nudge_x = 0.21,
-            nudge_y = 0.0) + 
-  geom_text(data = sizeGrp_slopes_Q10,
-            aes(x = sizeGrp, y = Q10_lwr, label = paste0("n = ", n)),
-            nudge_y = -0.2,   
-            size = 3.5, colour = "grey40") +
   scale_colour_manual(values = grp_cols, labels = c("Mesoplankton", "Macroplankton")) +
   labs(x = "Size group",
        y = bquote(bold("Carbon-mass specific Q"[10])),
@@ -354,10 +333,9 @@ sizeGQ10plot <- ggplot() +
 sizeGQ10plot
 
 
-tempPlot/sizeGQ10plot +
-  plot_layout(guides = "collect") 
+tempPlot/sizeGQ10plot
 
 # Save it
 ggsave("Output/Figure3/Figure3_tempPlot.pdf", tempPlot, width = 160, height = 150, units = "mm", dpi = 300)
-ggsave("Output/Figure3/Figure3_Q10Plot.pdf", sizeGQ10plot, width = 160, height = 70, units = "mm", dpi = 300)
+ggsave("Output/Figure3/Figure3_Q10Plot.pdf", sizeGQ10plot, width = 160, height = 120, units = "mm", dpi = 300)
 

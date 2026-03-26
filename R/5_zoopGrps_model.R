@@ -153,7 +153,6 @@ summary(mdat)
 m1 <- glmmTMB(ln_Cspecific_rate ~ 
                 temp_C * rate_name * zoopGrp + # 3-way interaction
                 (temp_C | primRef) + (1 | taxa), # with primRef and taxa as random intercepts and slopes
-              dispformula = ~rate_name,
               data = mdat)
 
   # Check diagnostics
@@ -213,26 +212,26 @@ d_respiration <- m2$data[m2$rate_name == "Respiration"][[1]]
 # Clearance
 sim <- simulateResiduals(m_clearance)
 plot(sim) # doesn't look great
-# Let's update the model with a dispersion formula to try improve heteroscedasticity
+# Let's update the model with a dispersion formula to try improve homoscedasticity
 m_clearance2 <- update(m_clearance, dispformula = ~zoopGrp, data = d_clearance)
 sim <- simulateResiduals(m_clearance2)
 plot(sim) 
-# doesn't seem to have improved anything, we will stick with the first model and accept this as a limitation instead of overfitting this data
+# doesn't seem to have improved anything, we will stick with the first model and accept this as a limitation instead of over fitting this data
 summary(m_clearance)
 
 
 # Ingestion
 sim <- simulateResiduals(m_ingestion)
 plot(sim) # basically have the same issue here with ingestion
-m_ingestion2 <- update(m_ingestion, dispformula = ~zoopGrp, data = d_ingestion)
+m_ingestion2 <- update(m_ingestion, dispformula = ~zoopGrp, data = d_ingestion) # update with dispersion formula across each group
 sim <- simulateResiduals(m_ingestion2)
-plot(sim) # also no difference...
+plot(sim) # also no difference...stick with original model
 summary(m_ingestion)
 
 
 # Growth
 sim <- simulateResiduals(m_growth)
-plot(sim) # residuals are sitting above the line on the QQ plot, probabaly an artefact of slightly left-skewed data
+plot(sim) # residuals are sitting above the line on the QQ plot, probably an artifact of slightly left-skewed data
   # the residuals vs predicted plot looks OK
 summary(m_growth)
 
@@ -250,10 +249,15 @@ summary(clear_slopes, infer = TRUE) # test whether each slope is different from 
 pairs(clear_slopes)
   # No sig differences between any groups for clearance rate
 
+# Get n
+n_obs_clearance <- d_clearance %>%
+  count(zoopGrp)
+
 clearanceQ10 <- as.data.frame(clear_slopes) %>% 
-  mutate(Q10 = exp(10 * temp_C.trend),
-         Q10_lwr = exp(10 * asymp.LCL),
-         Q10_upr = exp(10 * asymp.UCL))
+  mutate(Q10 = round(exp(10* temp_C.trend), digits = 2),
+         Q10_lwr = round(exp(10 * asymp.LCL), digits = 2),
+         Q10_upr = round(exp(10 * asymp.UCL), digits = 2)) %>% 
+  left_join(n_obs_clearance, by = "zoopGrp")
 clearanceQ10
 
 
@@ -263,10 +267,15 @@ summary(ingest_slopes, infer = TRUE) # test whether each slope is different from
 pairs(ingest_slopes)
   # No sig differences between any groups for ingestion rate
 
+# Get n
+n_obs_ingestion <- d_ingestion %>%
+  count(zoopGrp)
+
 ingestionQ10 <- as.data.frame(ingest_slopes) %>% 
-  mutate(Q10 = exp(10 * temp_C.trend),
-         Q10_lwr = exp(10 * asymp.LCL),
-         Q10_upr = exp(10 * asymp.UCL))
+  mutate(Q10 = round(exp(10* temp_C.trend), digits = 2),
+         Q10_lwr = round(exp(10 * asymp.LCL), digits = 2),
+         Q10_upr = round(exp(10 * asymp.UCL), digits = 2)) %>% 
+  left_join(n_obs_ingestion, by = "zoopGrp")
 ingestionQ10
 
 
@@ -278,10 +287,15 @@ pairs(growth_slopes)
   # cnidarians - copepods
   # chaetognaths - copepods
 
+# Get n
+n_obs_growth <- d_growth %>%
+  count(zoopGrp)
+
 growthQ10 <- as.data.frame(growth_slopes) %>% 
-  mutate(Q10 = exp(10 * temp_C.trend),
-         Q10_lwr = exp(10 * asymp.LCL),
-         Q10_upr = exp(10 * asymp.UCL))
+  mutate(Q10 = round(exp(10* temp_C.trend), digits = 2),
+         Q10_lwr = round(exp(10 * asymp.LCL), digits = 2),
+         Q10_upr = round(exp(10 * asymp.UCL), digits = 2)) %>% 
+  left_join(n_obs_growth, by = "zoopGrp")
 growthQ10
 
 
@@ -291,20 +305,23 @@ summary(resp_slopes, infer = TRUE) # test whether each slope is different from z
 pairs(resp_slopes)
   # ctenophores - cnidarians
   # cnidarians- copepods
-  # 
+  # cnidarians - euphausiids
+
+# Get n
+n_obs_respiration <- d_respiration %>%
+  count(zoopGrp)
 
 respQ10 <- as.data.frame(resp_slopes) %>% 
-  mutate(Q10 = exp(10 * temp_C.trend),
-         Q10_lwr = exp(10 * asymp.LCL),
-         Q10_upr = exp(10 * asymp.UCL))
+  mutate(Q10 = round(exp(10* temp_C.trend), digits = 2),
+         Q10_lwr = round(exp(10 * asymp.LCL), digits = 2),
+         Q10_upr = round(exp(10 * asymp.UCL), digits = 2)) %>% 
+  left_join(n_obs_respiration, by = "zoopGrp")
 respQ10
 
-
-# Print summaries
-summary(m_clearance)
-summary(m_ingestion)
-summary(m_growth)
-summary(m_respiration)
+clearanceQ10
+ingestionQ10
+growthQ10
+respQ10
 
 
 
@@ -320,7 +337,6 @@ grp_cols <- c(
   "Decapods"     = "#D55E00",  # vermillion
   "Euphausiids"  = "#CC79A7",  # pink
   "Thaliaceans"  = "#000000")   # black
-
 
 
 # Set min and max temp
@@ -381,7 +397,8 @@ PlotLMM = function(model, data){
 # Plot it
 # Clearance
 clearPlot <- PlotLMM(m_clearance, d_clearance) + 
-  labs(y = expression(bold("ln (Clearance rate (ml mgC"^-1*" h"^-1*"))"))) +
+  labs(y = expression(atop(bold("ln (Clearance rate)"),
+                           bold("(ml mgC"^-1*" h"^-1*")")))) +
   theme(legend.position = "none") +
   facet_wrap(~zoopGrp, nrow = 1)
 clearPlot
@@ -389,7 +406,8 @@ clearPlot
 
 # Ingestion
 ingPlot <- PlotLMM(m_ingestion, d_ingestion) + 
-  labs(y = expression(bold("ln (Ingestion rate (mgC mgC"^-1*" h"^-1*"))"))) +
+  labs(y = expression(atop(bold("ln (Ingestion rate)"),
+                           bold("(mgC mgC"^-1*" h"^-1*")")))) +
   theme(legend.position = "none") +
   facet_wrap(~zoopGrp, nrow = 1)
 ingPlot
@@ -397,24 +415,30 @@ ingPlot
 
 # Growth
 growPlot <- PlotLMM(m_growth, d_growth) + 
-  labs(y = expression(bold("ln (Growth rate (mgC mgC"^-1*" h"^-1*"))"))) +
+  labs(y = expression(atop(bold("ln (Growth rate)"),
+                           bold("(mgC mgC"^-1*" h"^-1*")")))) +
   facet_wrap(~zoopGrp, nrow = 2)
 growPlot
 
 
 # Respiration
 respPlot <- PlotLMM(m_respiration, d_respiration) + 
-  labs(y = expression(bold("ln (Respiration rate (" * mu * "LO"[2] * " mgC"^-1 * " h"^-1 * "))"))) +
+  labs(y = expression(atop(bold("Respiration rate"),
+                           bold("(" * mu * "lO"[2] * " mgC"^-1 * " h"^-1 * ")")))) +
   theme(legend.position = "none") +
   facet_wrap(~zoopGrp, nrow = 1)
 respPlot 
 
 tempPlots <- clearPlot / ingPlot / growPlot / respPlot + 
-  plot_layout(guides = "collect", heights = c(1, 1, 2, 1)) # adjust relative heights here
+  plot_layout(
+    axis_titles = "collect_x",
+    guides = "collect", heights = c(1, 1, 2, 1)) # adjust relative heights of each subplot
 tempPlots
 
 
-# Plot zoopGrp Q10s
+
+
+# Plot zoopGrp Q10s ----
 # Clearance
 clearQ10plot <- ggplot() +
   geom_errorbar(data = clearanceQ10, 
@@ -431,12 +455,12 @@ clearQ10plot <- ggplot() +
   scale_fill_manual(values = grp_cols) +
   scale_colour_manual(values = grp_cols) +
   labs(x = "Taxonomic group",
-       y = bquote(bold("Carbon-mass specific clearance rate Q"[10])),
+       y = bquote(bold("Carbon-mass specific clearance Q"[10])),
        colour = "Taxonomic group") +
   theme(
     axis.title = element_text(size = 11, face = "bold"),
     axis.text = element_text(size = 10),
-    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.x = element_text(angle = 25, hjust = 1),
     legend.position = "none")
 clearQ10plot
 
@@ -457,12 +481,12 @@ ingQ10plot <- ggplot() +
   scale_fill_manual(values = grp_cols) +
   scale_colour_manual(values = grp_cols) +
   labs(x = "Taxonomic group",
-       y = bquote(bold("Carbon-mass specific ingestion rate Q"[10])),
+       y = bquote(bold("Carbon-mass specific ingestion Q"[10])),
        colour = "Taxonomic group") +
   theme(
     axis.title = element_text(size = 11, face = "bold"),
     axis.text = element_text(size = 10),
-    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.x = element_text(angle = 25, hjust = 1),
     legend.position = "none")
 ingQ10plot
 
@@ -483,12 +507,12 @@ growQ10plot <- ggplot() +
   scale_fill_manual(values = grp_cols) +
   scale_colour_manual(values = grp_cols) +
   labs(x = "Taxonomic group",
-       y = bquote(bold("Carbon-mass specific growth rate Q"[10])),
+       y = bquote(bold("Carbon-mass specific growth Q"[10])),
        colour = "Taxonomic group") +
   theme(
     axis.title = element_text(size = 11, face = "bold"),
     axis.text = element_text(size = 10),
-    axis.text.x = element_text(angle = 45, hjust = 1))
+    axis.text.x = element_text(angle = 25, hjust = 1))
 growQ10plot
 
 
@@ -508,12 +532,12 @@ respQ10plot <- ggplot() +
   scale_fill_manual(values = grp_cols) +
   scale_colour_manual(values = grp_cols) +
   labs(x = "Taxonomic group",
-       y = bquote(bold("Carbon-mass specific respiration rate Q"[10])),
+       y = bquote(bold("Carbon-mass specific respiration Q"[10])),
        colour = "Taxonomic group") +
   theme(
     axis.title = element_text(size = 11, face = "bold"),
     axis.text = element_text(size = 10),
-    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.x = element_text(angle = 25, hjust = 1),
     legend.position = "none")
 respQ10plot
 

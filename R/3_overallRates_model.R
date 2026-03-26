@@ -15,7 +15,7 @@
 library(tidyverse)
 library(glmmTMB) # for modelling
 library(DHARMa) # for diagnostics
-library(emmeans) # Estimated marginal means
+library(emmeans) # estimated marginal means
 library(performance)
 library(patchwork)
 theme_set(new = theme_bw())
@@ -122,7 +122,6 @@ summary(mdat)
 m1 <- glmmTMB(ln_Cspecific_rate ~ 
                 temp_C * rate_name + # interactions between temp and different rates across all zooplankton
                 (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
-              dispformula = ~rate_name, # use dispersion submodel because clearance and ingestion are slightly skewed 
               data = mdat) 
 
   # Check diagnostics
@@ -136,7 +135,6 @@ m1 <- glmmTMB(ln_Cspecific_rate ~
 m2 <- glmmTMB(ln_Cspecific_rate ~ 
                 temp_C * rate_name + # interactions between temp and different rates across all zooplankton
                 (1 | primRef) + (1 | taxa), # with primRef and taxa as random intercepts only
-              dispformula = ~rate_name,
               data = mdat)
 
   # Check diagnostics
@@ -145,20 +143,9 @@ m2 <- glmmTMB(ln_Cspecific_rate ~
   summary(m2)
 
 
-# m1 but without the dispersion submodel
-m3 <- glmmTMB(ln_Cspecific_rate ~ 
-                temp_C * rate_name + 
-                (temp_C | primRef) + (temp_C | taxa),
-              dispformula = ~1,
-              data = mdat)
-  # Check diagnostics
-  sim <- simulateResiduals(m3)
-  plot(sim) # Looks fine but seems less scattered compared to m1
-  summary(m3)
 
-  
 # Compare models
-performance::compare_performance(m1, m2, m3)
+performance::compare_performance(m1, m2)
 # Models are not all mutually nested...we'll just treat AIC/BIC as descriptive...
 # Seems like m1 is the best fit so far
 
@@ -167,10 +154,6 @@ performance::compare_performance(m1, m2, m3)
 # Refit with REML for valid test on fixed/dispersion and random effect structures
 m1_m1 <- update(m1, REML = FALSE)
 m2_m2 <- update(m2, REML = FALSE)
-m3_m3 <- update(m3, REML = FALSE)
-
-anova(m1_m1, m3_m3) # test if dispersion submodel is justified
-  # m1 is still best fit, dispersion submodel is improving my explanatory power here
 
 anova(m1_m1, m2_m2) # test which random effects structure is a better fit
   # m1 is better
