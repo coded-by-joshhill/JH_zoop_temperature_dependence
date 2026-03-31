@@ -151,7 +151,7 @@ performance::compare_performance(m1, m2)
 
 
 # Likelihood ratios test of the models
-# Refit with REML for valid test on fixed/dispersion and random effect structures
+# Refit with ML for valid test on fixed/dispersion and random effect structures
 m1_m1 <- update(m1, REML = FALSE)
 m2_m2 <- update(m2, REML = FALSE)
 

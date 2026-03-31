@@ -175,7 +175,7 @@ m1 <- glmmTMB(ln_Cspecific_rate ~
 mdat %>%
   count(rate_name, zoopGrp) %>%
   pivot_wider(names_from = zoopGrp, values_from = n, values_fill = 0)
-  # 12 rate to group combinations lacking data to estimate coefficients
+  # ~12 rate to group combinations lacking data to estimate coefficients
 
 # Because there are many zeros across the groups and rates...I will fit per-rate models to estimate temperature dependence for available groups
 
@@ -186,11 +186,10 @@ m2 <- mdat %>% # using my model data
   group_by(rate_name) %>% # group by each rate 
   nest() %>% # nest each rate into their own tibbles
   mutate(
-    fit = map(data, \(data) glmmTMB(
-      ln_Cspecific_rate ~ 
-        temp_C * zoopGrp + # two-way interaction between temp and zooplankton group
+    fit = map(data, \(data) glmmTMB( # then fit a mixed effect model
+      ln_Cspecific_rate ~ # with mass-specific rates as a function off...
+        temp_C * zoopGrp + # a two-way interaction between temp and zooplankton taxonomic group
         (1 | primRef) + (1 | taxa), # random intercepts only - insufficient data for random slopes
-      dispformula = ~1,
       data = data # use the nested rate-specific data slice
     )))
 
@@ -212,20 +211,13 @@ d_respiration <- m2$data[m2$rate_name == "Respiration"][[1]]
 # Clearance
 sim <- simulateResiduals(m_clearance)
 plot(sim) # doesn't look great
-# Let's update the model with a dispersion formula to try improve homoscedasticity
-m_clearance2 <- update(m_clearance, dispformula = ~zoopGrp, data = d_clearance)
-sim <- simulateResiduals(m_clearance2)
-plot(sim) 
-# doesn't seem to have improved anything, we will stick with the first model and accept this as a limitation instead of over fitting this data
+# we'll accept this as a limitation instead of over fitting this data
 summary(m_clearance)
 
 
 # Ingestion
 sim <- simulateResiduals(m_ingestion)
 plot(sim) # basically have the same issue here with ingestion
-m_ingestion2 <- update(m_ingestion, dispformula = ~zoopGrp, data = d_ingestion) # update with dispersion formula across each group
-sim <- simulateResiduals(m_ingestion2)
-plot(sim) # also no difference...stick with original model
 summary(m_ingestion)
 
 

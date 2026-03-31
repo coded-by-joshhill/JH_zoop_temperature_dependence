@@ -161,38 +161,20 @@ m2 <- glmmTMB(ln_Cspecific_rate ~
   summary(m2)
   
 
-# m1 but without random slopes, just intercepts
-m3 <- glmmTMB(ln_Cspecific_rate ~ 
-                temp_C * rate_name * sizeGrp + # three-way interaction
-                (1 | primRef) + (1 | taxa), # with primRef and taxa as random intercepts
-              data = mdat) 
-
-  # Check diagnostics
-  sim <- simulateResiduals(m3)
-  plot(sim) # Looks fine but seems less scattered compared to m1
-  summary(m3)
-
-  
 # Compare models
-performance::compare_performance(m1, m2, m3)
+performance::compare_performance(m1, m2)
 # Models are not all mutually nested...we'll just treat AIC/BIC as descriptive...
 
 
 # Likelihood ratios test of the models
-# Refit with REML for valid test on fixed/dispersion and random effect structures
+# Refit with ML for valid test on fixed/dispersion and random effect structures
 m1_m1 <- update(m1, REML = FALSE)
 m2_m2 <- update(m2, REML = FALSE)
-m3_m3 <- update(m3, REML = FALSE)
 
 anova(m1_m1, m2_m2) # test if the three-way interaction is better than the two-way interaction
   # m1 with 3-way interaction is better
 
-anova(m1_m1, m3_m3) # test if 3 way interaction with simpler RE structure is better
-  # m1 RE structure is better
 
-anova(m1_m1, m2_m2, m3_m3) # although models are not mutually nested, lets look at all models for descriptive purposes
-# likelihood ratios test across the board shows m1 has significantly more explanatory power than other models
-# AIC and BIC is also slightly better
 # I will use m1 on the basis of the chisqr test and AIC...
 summary(m1)
 
@@ -200,7 +182,7 @@ summary(m1)
 
 # Extract slopes using and calculate Q10 for each sizeGrp ----
 sizeGrp_slopes <- emtrends(m1, ~ rate_name * sizeGrp, var = "temp_C")
-summary(sizeGrp_slopes, infer = TRUE) # test whether each slope is different from zero for each zoopGrp
+summary(sizeGrp_slopes, infer = TRUE) # test whether each slope is different from zero for each sizeGrp
 pairs(sizeGrp_slopes, by = "rate_name") # pairwise test whether slopes differ significantly across rate types and grps
   # yes, some slightly significant differences
 

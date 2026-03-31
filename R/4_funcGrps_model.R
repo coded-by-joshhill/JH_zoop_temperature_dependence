@@ -160,37 +160,20 @@ m2 <- glmmTMB(ln_Cspecific_rate ~
   plot(sim) # Looks fine but seems less scattered compared to m1
   summary(m2)
 
-
-# m1 but without random slopes, just intercepts
-m3 <- glmmTMB(ln_Cspecific_rate ~ 
-                temp_C * rate_name * funcGrp + # 3-way interaction
-                (1 | primRef) + (1 | taxa), # with primRef and taxa as random intercepts
-              data = mdat) 
-
-  # Check diagnostics
-  sim <- simulateResiduals(m3)
-  plot(sim) # Looks fine but seems less scattered compared to m1
-  summary(m3)
-
   
 # Compare models
-performance::compare_performance(m1, m2, m3)
+performance::compare_performance(m1, m2)
 # Models are not all mutually nested...we'll just treat AIC/BIC as descriptive...
 
 
 # Likelihood ratios test of the models
-# Refit with REML for valid test on fixed/dispersion and random effect structures
+# Refit with ML for valid test on fixed/dispersion and random effect structures
 m1_m1 <- update(m1, REML = FALSE)
 m2_m2 <- update(m2, REML = FALSE)
-m3_m3 <- update(m3, REML = FALSE)
 
 anova(m1_m1, m2_m2) # test if the three-way interaction is better than the two-way interaction
   # m1 with 3-way interaction is slightly better
 
-anova(m1_m1, m3_m3) # test if 3 way interaction with simpler RE structure is better
-  # m1 RE(slope and intercept) structure is better
-
-anova(m1_m1, m2_m2, m3_m3) # although models are not mutally nested, lets look at all models for descriptive purposes
 # we will progress with m1
 summary(m1)
 
