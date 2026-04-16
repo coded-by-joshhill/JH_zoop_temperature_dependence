@@ -217,7 +217,7 @@ summary(m_clearance)
 
 # Ingestion
 sim <- simulateResiduals(m_ingestion)
-plot(sim) # basically have the same issue here with ingestion
+plot(sim) # basically have the same issue here with ingestion though QQ looks better
 summary(m_ingestion)
 
 
@@ -504,8 +504,22 @@ growQ10plot <- ggplot() +
   theme(
     axis.title = element_text(size = 11, face = "bold"),
     axis.text = element_text(size = 10),
-    axis.text.x = element_text(angle = 25, hjust = 1))
+    axis.text.x = element_text(angle = 25, hjust = 1),
+    legend.position = "none",
+    legend.title = element_text(size = 10, face = "bold")) +
+  scale_x_discrete(expand = expansion(add = 0.8))  # adds 0.8 units of padding on each side
 growQ10plot
+
+library(ggbreak) # to break y-axis on massive Q10 variance
+growQ10plot_break <- growQ10plot +
+  geom_text(data = filter(growthQ10, 
+                          (zoopGrp == "Decapods" & Q10_upr > 2) |
+                          (zoopGrp == "Thaliaceans" & Q10_upr > 2)),
+            aes(x = zoopGrp, y = 1.8, label = paste0("↑ ", round(Q10_upr, 1))),
+            colour = "grey40", size = 4,
+            nudge_x = 0.3) +
+  coord_cartesian(ylim = c(0, 2))
+growQ10plot_break
 
 
 # Respiration
@@ -533,18 +547,47 @@ respQ10plot <- ggplot() +
     legend.position = "none")
 respQ10plot
 
+# Break the variance
+respQ10plot_break <- respQ10plot +
+  geom_text(data = filter(respQ10, 
+                          (zoopGrp == "Ctenophores" & Q10_upr > 5) |
+                            (zoopGrp == "Thaliaceans" & Q10_upr > 5)),
+            aes(x = zoopGrp, y = 5, label = paste0("↑ ", round(Q10_upr, 1))),
+            colour = "grey40", size = 4,
+            nudge_x = 0.3) +
+  coord_cartesian(ylim = c(0, 5))
+respQ10plot_break
 
-Q10Plots <- 
-  clearQ10plot +
-  ingQ10plot +
-  growQ10plot +
-  respQ10plot +
-  plot_layout(guides = "collect")
+
+
+tempPlots
+# Combine with patchwork
+Q10Plots <- (clearQ10plot + ingQ10plot) / (growQ10plot_break + respQ10plot_break) +
+  plot_layout(guides = "collect") & 
+  theme(legend.position = "none")
 Q10Plots
 
+# Can't save properly together so will do it separately
+clearQ10plot
+ingQ10plot
+growQ10plot_break
+respQ10plot_break
 
-tempPlots  
-Q10Plots 
+ggsave("Output/Figure5/Figure5_clearQ10.pdf", clearQ10plot, width = 90, height = 90, units = "mm", dpi = 300)
+ggsave("Output/Figure5/Figure5_ingQ10.pdf", ingQ10plot, width = 90, height = 90, units = "mm", dpi = 300)
+ggsave("Output/Figure5/Figure5_growQ10.pdf", growQ10plot_break, width = 90, height = 90, units = "mm", dpi = 300)
+ggsave("Output/Figure5/Figure5_respQ10.pdf", respQ10plot_break, width = 90, height = 90, units = "mm", dpi = 300)
 
+# Save the legend from this plot...
+legend <- growQ10plot_break +
+  theme(legend.position = "top")
+ggsave("Output/Figure5/Figure5_legend.pdf", legend, width = 180, height = 180, units = "mm", dpi = 300)
+
+
+
+
+# Save it
+ggsave("Output/Figure5/FigureS1_tempPlot.pdf", tempPlots, width = 160, height = 170, units = "mm", dpi = 300)
+ggsave("Output/Figure5/FigureS1_tempPlot.png", tempPlots, width = 160, height = 170, units = "mm", dpi = 300)
 
 

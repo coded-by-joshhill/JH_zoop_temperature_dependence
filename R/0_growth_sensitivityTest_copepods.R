@@ -18,7 +18,7 @@ theme_set(new = theme_bw())
 # Growth data
 grwdat <- readRDS("Data/grwth_dat.rds") %>% 
   drop_na(Cspecific_rate) %>% 
-  select(ref_no, life_stage, primRef, secRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, rate_value_clean, rate_unit_clean, temp_C, BMC_mg) %>%
+  select(ref_no, life_stage, primRef, secRef, order, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, rate_value_clean, rate_unit_clean, temp_C, BMC_mg) %>%
   mutate(rate_name = factor("Growth"),
          ln_Cspecific_rate = log(Cspecific_rate))
 
@@ -32,10 +32,45 @@ grwdat %>% distinct(zoopGrp)
 
 
 # Quick look
-grwdat %>% 
+# Growth by primRefs against tempC
+primRefPlot <- grwdat %>% 
   ggplot() +
-  geom_point(aes(x = temp_C, y = ln_Cspecific_rate, , colour = sizeGrp)) +
-  facet_wrap(~ rate_name, scale = "free")
+  geom_point(aes(x = temp_C, y = ln_Cspecific_rate, , colour = zoopGrp)) +
+  facet_wrap(~ primRef, scale = "free") +
+  labs(x = "Temperature (°C)",
+       y = expression("ln Growth rate (mgC mgC"^-1*" h"^-1*")"))
+primRefPlot
+ggsave("Output/GrowthTests/primRefPlot.pdf", primRefPlot, width = 400, height = 220, units = "mm", dpi = 300)
+
+# Look at body mass to rate ----
+# Temperature normalisation using Q10 = 2
+Q10 <- 2
+T_ref <- 15  # reference temperature (°C)
+
+grwdat <- grwdat %>%
+  mutate(
+    rate_norm      = rate_value_clean * Q10^((T_ref - temp_C) / 10),
+    Cspecific_norm = Cspecific_rate   * Q10^((T_ref - temp_C) / 10)
+  )
+
+# Growth by BMC
+a <- grwdat %>% 
+  ggplot() +
+  geom_point(aes(x = log(BMC_mg), y = log(rate_norm), , colour = zoopGrp)) +
+ facet_wrap(~ primRef, scale = "free") +
+  labs(x = "ln Carbon mass (mg)",
+       y = "ln Absolute Growth rate")
+a
+
+b <- grwdat %>% 
+  ggplot() +
+  geom_point(aes(x = log(BMC_mg), y = log(Cspecific_norm), , colour = zoopGrp)) +
+  facet_wrap(~ primRef, scale = "free") +
+  labs(x = "ln Carbon mass (mg)",
+       y = "ln Carbon-mass specific growth rate")
+b
+# looks wrong because it's not normalised by temp.
+
 
 grwdat %>% 
   filter(zoopGrp == "Copepods") %>%
