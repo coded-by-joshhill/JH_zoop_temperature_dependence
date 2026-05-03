@@ -1,6 +1,6 @@
 # Calculating overall rate Q10s
 # Josh Hill
-# 11/03/2026
+# 03/05/2026
 
 
 
@@ -16,6 +16,7 @@ library(tidyverse)
 library(glmmTMB) # for modelling
 library(DHARMa) # for diagnostics
 library(emmeans) # estimated marginal means
+library(MuMIn) # for R2s
 library(performance)
 library(patchwork)
 theme_set(new = theme_bw())
@@ -38,7 +39,7 @@ cleardat <- dat %>%
 
 # Ingestion data
 ingdat <- dat %>% 
-  filter(rate_name == "IngestionRate") %>% # Filter for clearance rate
+  filter(rate_name == "IngestionRate") %>% # Filter for ingestion rate
   select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Ingestion"))
@@ -58,7 +59,7 @@ respdat <- readRDS("Data/resp_dat.rds") %>%
   mutate(rate_name = factor("Respiration"))
 
 
-# Combine them into one dataframe
+# Combine them into one...
 usedat <- rbind(cleardat, ingdat, grwdat, respdat)
 
 
@@ -70,7 +71,7 @@ usedat %>%
     # -1.8-31 degC
 
 
-# Quickly view distribution of raw Cspecific_rates
+# Quickly view the distribution of raw Cspecific_rates
 # I will use these to remove extreme outliers, particularly those that don't make biological sense
 usedat %>%
   ggplot() +
@@ -80,8 +81,9 @@ usedat %>%
   labs(
     x = "Temp C",
     y = "Clearance rate")
+  # all seems reasonable and the data looks standard
 
-
+# Check distribution of data
 usedat %>%
   ggplot(aes(x = log(Cspecific_rate))) + # log because we will transform the data for analysis
   geom_histogram(bins = 50, fill = "pink", colour = "grey") +
@@ -97,7 +99,7 @@ usedat %>%
 
 # Tidy up data and prep data for modelling ----
 mdat <- usedat %>% 
-  mutate(ln_Cspecific_rate = log(Cspecific_rate)) # log transform mass-specific rate
+  mutate(ln_Cspecific_rate = log(Cspecific_rate)) # log transform mass-specific rate and save as new variable
 
 
 # Quick look
@@ -139,7 +141,7 @@ m2 <- glmmTMB(ln_Cspecific_rate ~
 
   # Check diagnostics
   sim <- simulateResiduals(m2)
-  plot(sim) # Looks ok but seems less scattered compared to m1
+  plot(sim) # Looks ok but seems less scattered compared to m1 and slightly more deviation in QQplot
   summary(m2)
 
 
@@ -158,19 +160,20 @@ m2_m2 <- update(m2, REML = FALSE)
 anova(m1_m1, m2_m2) # test which random effects structure is a better fit
   # m1 is better
 
-# we will proceed with m1 on the basis of AIC, BIC and likelihood ratio tests
+# We will proceed with m1 on the basis of AIC, BIC and likelihood ratio tests
 summary(m1)
+r.squaredGLMM(m1)
+# R2m       R2c
+# 0.8921226 0.9701256
 
-
-# Extract slopes and calculate Q10 for overall zooplankton ----
-slopes <- emtrends(m1, ~ rate_name, var = "temp_C")
+# Extract slopes and calculate Q10 for all zooplankton ----
+slopes <- emmeans::emtrends(m1, ~ rate_name, var = "temp_C")
 summary(slopes, infer = TRUE) # test whether each slope is different from zero for each zoopGrp
   # all except growth
-pairs(slopes) # pairwise test whether slopes differ significantly across rate types
+emmeans::contrast(slopes, method = "pairwise", adjust = "mvt") # pairwise test whether slopes differ significantly across rate types
   # slight difference between clearance-ingestion
+  # clearance - ingest
   # clearance - growth
-  # ingestion - growth
-  # growth - respiration
 
 # Get n_obs
 n_obs <- mdat %>%
@@ -178,12 +181,11 @@ n_obs <- mdat %>%
 
 # Get Q10
 slopes_Q10 <- as.data.frame(slopes) %>% 
-  mutate(Q10 = round(exp(10* temp_C.trend), digits = 2),
+  mutate(Q10 = round(exp(10 * temp_C.trend), digits = 2),
          Q10_lwr = round(exp(10 * asymp.LCL), digits = 2),
          Q10_upr = round(exp(10 * asymp.UCL), digits = 2)) %>% 
   left_join(n_obs, by = "rate_name")
 slopes_Q10
-
 
 
 

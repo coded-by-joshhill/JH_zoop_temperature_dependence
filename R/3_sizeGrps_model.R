@@ -1,6 +1,6 @@
 # Calculating sizeGrps Q10s
 # Josh Hill
-# 11/03/2026
+# 03/05/2026
 
 
 
@@ -126,7 +126,7 @@ summary(mdat)
 
 # My main question here is...
   # How does temperature dependence vary across zooplankton groups for each rate? AND
-  # How does temperature dependence vary across rate processes?
+  # How does temperature dependence vary across rate processes among groups?
 
 # I am also mainly interested in the interactions between at least temp:rate and temp:group
 
@@ -183,7 +183,7 @@ summary(m1)
 # Extract slopes using and calculate Q10 for each sizeGrp ----
 sizeGrp_slopes <- emtrends(m1, ~ rate_name * sizeGrp, var = "temp_C")
 summary(sizeGrp_slopes, infer = TRUE) # test whether each slope is different from zero for each sizeGrp
-pairs(sizeGrp_slopes, by = "rate_name") # pairwise test whether slopes differ significantly across rate types and grps
+emmeans::contrast(sizeGrp_slopes, by = "rate_name", method = "pairwise", adjustment = "none") # pairwise test whether slopes differ significantly across rate types and grps
   # yes, some slightly significant differences
 
 # Get n

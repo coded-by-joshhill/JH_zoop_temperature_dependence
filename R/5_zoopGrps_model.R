@@ -175,7 +175,7 @@ m1 <- glmmTMB(ln_Cspecific_rate ~
 mdat %>%
   count(rate_name, zoopGrp) %>%
   pivot_wider(names_from = zoopGrp, values_from = n, values_fill = 0)
-  # ~12 rate to group combinations lacking data to estimate coefficients
+  # 9 rate to group combinations lacking data to estimate coefficients
 
 # Because there are many zeros across the groups and rates...I will fit per-rate models to estimate temperature dependence for available groups
 
@@ -188,10 +188,9 @@ m2 <- mdat %>% # using my model data
   mutate(
     fit = map(data, \(data) glmmTMB( # then fit a mixed effect model
       ln_Cspecific_rate ~ # with mass-specific rates as a function off...
-        temp_C * zoopGrp + # a two-way interaction between temp and zooplankton taxonomic group
-        (1 | primRef) + (1 | taxa), # random intercepts only - insufficient data for random slopes
-      data = data # use the nested rate-specific data slice
-    )))
+        temp_C * zoopGrp + # a two-way interaction between temp and zoop taxonomic group
+        (1 | primRef) + (1 | taxa), # with random intercepts only - insufficient data for random slopes
+      data = data))) # using the nested rate-specific data
 
 
 # Extract each model using the name
@@ -238,7 +237,7 @@ summary(m_respiration)
 # Clearance
 clear_slopes <- emtrends(m_clearance, ~zoopGrp, var = "temp_C")
 summary(clear_slopes, infer = TRUE) # test whether each slope is different from zero for each zoopGrp
-pairs(clear_slopes)
+emmeans::contrast(clear_slopes, method = "pairwise", adjust = "mvt")
   # No sig differences between any groups for clearance rate
 
 # Get n
@@ -256,7 +255,7 @@ clearanceQ10
 # Ingestion
 ingest_slopes <- emtrends(m_ingestion, ~zoopGrp, var = "temp_C")
 summary(ingest_slopes, infer = TRUE) # test whether each slope is different from zero for each zoopGrp
-pairs(ingest_slopes)
+pairs(ingest_slopes, method = "pairwise", adjust = "mvt")
   # No sig differences between any groups for ingestion rate
 
 # Get n
@@ -274,7 +273,7 @@ ingestionQ10
 # Growth
 growth_slopes <- emtrends(m_growth, ~zoopGrp, var = "temp_C")
 summary(growth_slopes, infer = TRUE)# test whether each slope is different from zero for each zoopGrp
-pairs(growth_slopes)
+pairs(growth_slopes, method = "pairwise", adjust = "mvt")
   # ctenophores - copepods
   # cnidarians - copepods
   # chaetognaths - copepods
@@ -294,7 +293,7 @@ growthQ10
 # Respiration
 resp_slopes <- emtrends(m_respiration, ~zoopGrp, var = "temp_C")
 summary(resp_slopes, infer = TRUE) # test whether each slope is different from zero for each zoopGrp
-pairs(resp_slopes)
+pairs(resp_slopes, method = "pairwise", adjust = "mvt")
   # ctenophores - cnidarians
   # cnidarians- copepods
   # cnidarians - euphausiids
@@ -415,7 +414,7 @@ growPlot
 
 # Respiration
 respPlot <- PlotLMM(m_respiration, d_respiration) + 
-  labs(y = expression(atop(bold("Respiration rate"),
+  labs(y = expression(atop(bold("ln (Respiration rate)"),
                            bold("(" * mu * "lO"[2] * " mgC"^-1 * " h"^-1 * ")")))) +
   theme(legend.position = "none") +
   facet_wrap(~zoopGrp, nrow = 1)
@@ -515,10 +514,10 @@ growQ10plot_break <- growQ10plot +
   geom_text(data = filter(growthQ10, 
                           (zoopGrp == "Decapods" & Q10_upr > 2) |
                           (zoopGrp == "Thaliaceans" & Q10_upr > 2)),
-            aes(x = zoopGrp, y = 1.8, label = paste0("↑ ", round(Q10_upr, 1))),
+            aes(x = zoopGrp, y = 5.5, label = paste0("↑ ", round(Q10_upr, 1))),
             colour = "grey40", size = 4,
             nudge_x = 0.3) +
-  coord_cartesian(ylim = c(0, 2))
+  coord_cartesian(ylim = c(0, 6))
 growQ10plot_break
 
 

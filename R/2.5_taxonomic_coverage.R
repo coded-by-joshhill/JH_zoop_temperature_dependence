@@ -47,7 +47,7 @@ mycols <- c("Clearance" = "#66c2a5", "Ingestion" = "#fc8d62", "Growth" = "#8da0c
 # Quick function to select data across each dataset
 temp_dat_summary <- function(data, dataset_name) {
   data %>%
-    select(temp_C, Cspecific_rate) %>%
+    select(temp_C, Cspecific_rate, primRef) %>%
     mutate(Dataset = dataset_name)
 }
 
@@ -67,14 +67,15 @@ tempDat_binded %>%
     n_total = n(),
     n_temp_range = sum(temp_C >= 0 & temp_C <= 30, na.rm = TRUE),
     prop_temp_range = n_temp_range / n_total * 100)
+# Data between 0 and 30 degC
 # n_total n_temp_range prop_temp_range
-#    2553         2422            94.9
+#    2555         2424            94.9
 
 
 
 # What proportion of each dataset had the method report? ----
 # Quick function to select data across each dataset
-food_dat_summary <- function(data, dataset_name) {
+method_dat_summary <- function(data, dataset_name) {
   data %>%
     select(ref_no, food_type, food_conc, method, locality) %>%
     mutate(Dataset = dataset_name)
@@ -82,24 +83,24 @@ food_dat_summary <- function(data, dataset_name) {
 
 
 # Bind all the data into a tibble
-foodDat_binded <- bind_rows(
-  food_dat_summary(respiration, "respiration"),
-  food_dat_summary(growth, "growth"),
-  food_dat_summary(clearance, "clearance"),
-  food_dat_summary(ingestion, "ingestion"))
+methodDat_binded <- bind_rows(
+  method_dat_summary(respiration, "respiration"),
+  method_dat_summary(growth, "growth"),
+  method_dat_summary(clearance, "clearance"),
+  method_dat_summary(ingestion, "ingestion"))
 
 
 # Table S1 ----
 # Summarise the experiment method data and calculate the proportions reported and not reported.
-foodDat_binded %>% 
-  mutate(method = if_else(is.na(method), "Not reported", method)) %>%
-  group_by(method) %>%
-  mutate(method = recode(method,
-                         "NA"                   = "Not reported",
+methodDat_binded %>% 
+  mutate(
+    method = if_else(is.na(method), "Not reported", method),
+    method = recode(method,
+                         "NA"                             = "Not reported",
                          "Bottle incubation"              = "Controlled experiment",
                          "In situ bottle incubation"      = "In situ experiment",
                          "Meta-analysis"                  = "Not reported",
-                         "Meta analysis"                  = "Not reported",
+                         "Meta analysis"                  = "Not reported", # has no hypen so is different to above...
                          "Oxygen respirometry"            = "Controlled experiment",
                          "Water bottle method"            = "Controlled experiment",
                          "Water bottle"                   = "Controlled experiment",
@@ -110,18 +111,33 @@ foodDat_binded %>%
                          "Respirometer chamber"           = "Controlled experiment",
                          "Through-flow system"            = "Controlled experiment",
                          "Feeding tank"                   = "Controlled experiment"
-  )
-  ) %>% 
+                         )
+         ) %>% 
+  group_by(method) %>%
   summarise(n = n(), .groups = "drop") %>%
   mutate(prop_method = n / sum(n) * 100) %>% 
-  arrange(-prop_method) %>% 
-  print(n = "Inf")
+  arrange(-prop_method)
 # Table S1 - Proportion of methods used for original data collection
 # method                    n         prop_method
 # Not reported           1768       68.3 
-# Controlled experiment   764       29.5 
-# In situ experiment       56       2.16
+# Controlled experiment   766       29.5 
+# In situ experiment       56       2.2
 
+# How many total observations?
+1768 + 766 + 56
+  # 2590
+
+# What is the number of distinct records per rate?
+tempDat_binded %>% group_by(Dataset) %>% distinct(primRef) %>% count()
+# Dataset         n
+# 1 clearance      64
+# 2 growth         54
+# 3 ingestion      43
+# 4 respiration    19
+
+# What is the number of distinct records?
+tempDat_binded %>% distinct(primRef) %>% nrow()
+# 138
 
 
 # Table 1 ---
@@ -142,8 +158,12 @@ taxonomic_coverage
 # Dataset     n_phylas n_classes n_orders n_families n_genera n_species n_observations n_records
 # 1 Clearance          5         8       12         27       35        65            618        64
 # 2 Ingestion          3         5        7         16       21        44            307        43
-# 3 Growth             5         7       16         28       32        48            681        54
+# 3 Growth             5         7       16         28       32        48            683        54
 # 4 Respiration        4         7       15         39       55       103            982        19
+
+# Total nobs
+618 + 307 + 683 + 982 
+  # 2590.... perfect. matches previous count
 
 # number of observations pre-cleaning were... 
 # Clearance   1580
@@ -162,12 +182,10 @@ allDat %>% # How many total unique groups/obs/records are there?
     totalOrder = n_distinct(order),
     totalFamily = n_distinct(family),
     totalGenera = n_distinct(genus),
-    totalSpecies = n_distinct(species),
-    totalObs = n_distinct(Cspecific_rate),
-    totalRecords = n_distinct(primRef))
+    totalSpecies = n_distinct(species))
 
-# totalPhylum totalClass totalOrder totalFamily totalGenera totalSpecies totalObs totalRecords
-#           5          9         21          54          82          167     2553          138
+#   totalPhylum totalClass totalOrder totalFamily totalGenera totalSpecies
+#   1           5          9         21          54          82          167
 
 
 
@@ -220,7 +238,10 @@ respiration_by_Sgroup
 # Combine the summaries and plot it up
 all_Sgroups <- bind_rows(clearance_by_Sgroup, ingestion_by_Sgroup, growth_by_Sgroup, respiration_by_Sgroup) %>%
   mutate(dataset = factor(dataset, levels = c("Clearance",  "Ingestion", "Growth", "Respiration")),
-         sizeGrp = factor(sizeGrp, levels = Sgroup_order))  # use group order
+         sizeGrp = factor(sizeGrp, levels = Sgroup_order), # use group order
+         sizeGrp = recode(sizeGrp,
+                          "Mesoplankton" = "Mesozooplankton",
+                          "Macroplankton" = "Macrozooplankton"))  
 
 
 SgrpFreqPlot <- ggplot(all_Sgroups, 
@@ -444,6 +465,8 @@ Fig1_combined <- SgrpFreqPlot_no_y + FgrpFreqPlot_no_y + ZgrpFreqPlot +
 
 Fig1_combined
 
-ggsave("Output/Figure_1_FreqPlots.pdf", Fig1_combined, width = 180, height = 160, units = "mm", dpi = 300)
+ggsave("Output/Figure_1_FreqPlots.pdf", Fig1_combined, width = 180, height = 165, units = "mm", dpi = 300)
+ggsave("Output/Figure_1_FreqPlots.png", Fig1_combined, width = 180, height = 165, units = "mm", dpi = 300)
+
 
 

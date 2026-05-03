@@ -30,7 +30,7 @@ GoldsteinDat <- read_csv("https://www.dropbox.com/scl/fi/6o7ovfttvc7roz0kc27n1/G
   mutate(BM_C = C_M0_mg, # carbon mass gets the initial weight measurement
          weight_unit = "mg", # update the weight unit
          rate_value = calcGrowthRate(C_M1_mg, C_M0_mg, time_days), # estimate growth rate with function
-         rate_value = (rate_value /BM_C) / 24, # convert growth rate to mass specific and to hour
+         rate_value = rate_value / 24, # convert growth rate to mass specific and to hour
          rate_unit = "mgC/mgC/hr") %>% # update the rate unit
   select(-c(C_M1_mg, C_M0_mg, time_days)) # tidy the dataframe and prep for binding
 glimpse(GoldsteinDat)
@@ -45,7 +45,7 @@ LuskowDat <- read_csv("https://www.dropbox.com/scl/fi/uyqkquws5jvw7gfbd95oa/Lusk
          BM_C = C_M0_mg, # carbon mass gets the initial weight measurement (in carbon form)
          weight_unit = "mg", # update the weight unit
          rate_value = calcGrowthRate(C_M1_mg, C_M0_mg, time_days), # estimate growth rate with function
-         rate_value = (rate_value /BM_C) / 24, # convert growth rate to mass specific and to hour
+         rate_value = rate_value / 24, # convert growth rate to mass specific and to hour
          rate_unit = "mgC/mgC/hr" # update the rate unit
   ) %>% 
   select(-c(DW_M1_mg, DW_M0_mg, C_M1_mg, C_M0_mg, time_days))
@@ -60,7 +60,7 @@ ReyDat <- read_csv("https://www.dropbox.com/scl/fi/896t9633il9zjkmev423p/Rey2001
          BM_C = C_M0_mg, # carbon mass gets the initial weight measurement
          weight_unit = "mg", # update the weight unit
          rate_value = calcGrowthRate(C_M1_mg, C_M0_mg, time_days), # estimate growth rate with function
-         rate_value = (rate_value /BM_C) / 24, # convert growth rate to mass specific and to hour
+         rate_value = rate_value  / 24, # convert growth rate to mass specific and to hour
          rate_unit = "mgC/mgC/hr" # update the rate unit
   ) %>% 
   select(-c(C_M1_ug, C_M0_ug, C_M1_mg, C_M0_mg, time_days))
@@ -68,15 +68,17 @@ glimpse(ReyDat)
 
 
 # Read in the main data ----
-dat <- read_csv("https://www.dropbox.com/scl/fi/gdllcg9d1dx1dzf38pckd/Grwth_dat.csv?rlkey=xqayol7mkakxn2fdek5yvkkn8&st=49ooa3to&dl=1",
-                skip = 1) %>%
+dat <- read_csv("https://www.dropbox.com/scl/fi/gdllcg9d1dx1dzf38pckd/Grwth_dat.csv?rlkey=xqayol7mkakxn2fdek5yvkkn8&st=az686ihp&dl=1") %>%
   bind_rows(GoldsteinDat, LuskowDat, ReyDat) %>% # add in our estimated growth data
   mutate(ref_no = if_else(is.na(ref_no) | ref_no == "", # if the value is NA or empty...
                           paste0("Hill_", row_number()), # apply a unique reference number
                           ref_no), # otherwise keep what is there
          taxa = str_squish(taxa)) %>% # remove extra spaces from taxon names
   relocate(ref_no, .before = everything()) %>%   # move it before all columns
-  filter_out(data_type == "Mean") # exclude any mean data
+  filter_out(data_type == "Mean") %>%  # exclude any mean data
+  mutate(taxa = case_when(taxa == "Acartia (Acartiura) clausi" ~ "Acartia (Acartiura) clausii", # fix name...
+                          TRUE ~ taxa)) %>% # leave the rest as is...
+  select(-class)
 
 glimpse(dat)
 
@@ -84,7 +86,7 @@ glimpse(dat)
   # Count number of initial pre-cleaned records
   dat %>% group_by(rate_name) %>% 
     summarise(count = n())
-  # GrowthRate  684
+  # GrowthRate  488
 
 
   # Look at all unique taxon
@@ -105,7 +107,7 @@ glimpse(dat)
   
 
 # Subset taxa data to get AphiaIDs and classifications ----
-taxaDat <- dat %>% 
+taxaDat <- dat %>%
   select(taxa) %>% 
   distinct(taxa) %>% 
   arrange(taxa)
@@ -202,7 +204,8 @@ datClean <- dat %>%
     relocate(zoopGrp, .before = phylum) %>% 
     relocate(funcGrp, .before = zoopGrp) %>% 
     relocate(sizeGrp, .before = funcGrp)
-  
+
+glimpse(datClean)  
 # End data cleaning ----
 
      
@@ -212,16 +215,11 @@ datFinal <- datClean %>%
   # No need to harmoise this data (unless more is added)... so I'll use a simple mutate to maintain naming convention consistency
   mutate(Cspecific_rate = rate_value, # rate_value is already mass-specific so merge to consistent naming convention
          Cspecific_unit = rate_unit, # update the units
-         zoopGrp = as.factor(zoopGrp),
-         # Because I have some carbon mass values, we will also calculate absolute growth rates
-         rate_value_clean = Cspecific_rate * BMC_mg, # calculate absolute growth rate using available body mass carbon data
-         rate_unit_clean = "mgC/ind/hr") %>% # update the unit to match
+         zoopGrp = as.factor(zoopGrp)) %>% 
   relocate(Cspecific_rate, .after = rate_name) %>% 
   relocate(Cspecific_unit, .after = Cspecific_rate) %>%
-  relocate(rate_value_clean, .after = Cspecific_unit) %>% 
-  relocate(rate_unit_clean, .after = rate_value_clean) %>% 
-  filter(ref_no != "Pata_excl_1460", # exclude this huge outlier
-         Cspecific_rate < 0.075) # exclude rates that are not biologically reasonable
+  select(-BM_C)
+  
 glimpse(datFinal)
 
 # End conversion
@@ -232,13 +230,14 @@ glimpse(datFinal)
     ggplot() + 
     geom_point(aes(x = temp_C, 
                    y = log(Cspecific_rate), # mass-specific
-                   colour = sizeGrp))
+                   colour = primRef)) #+
+    #facet_wrap(~ zoopGrp, scales = "free")
   
   # sizeGrp
   datFinal %>% 
     ggplot() + 
     geom_point(aes(x = temp_C, 
-                   y = log(rate_value_clean), # absolute
+                   y = log(Cspecific_rate), # absolute
                    colour = sizeGrp))
   
   
@@ -263,15 +262,15 @@ glimpse(datFinal)
     mutate(countZGrp = sum(zoopGrp > 1, na.rm = TRUE)) %>% 
     distinct(zoopGrp, countZGrp) %>% 
     arrange(countZGrp)
-    # Mysids              14
-    # Decapods            28
-    # Chaetognaths        28
-    # Euphausiids         34
-    # Thaliaceans         34
-    # Amphipods           63
-    # Cnidarians          66
-    # Ctenophores        132
-    # Copepods           285
+    # 1 Mysids              10
+    # 2 Chaetognaths        14
+    # 3 Decapods            27
+    # 4 Euphausiids         33
+    # 5 Thaliaceans         34
+    # 6 Amphipods           63
+    # 7 Cnidarians          65
+    # 8 Ctenophores        102
+    # 9 Copepods           140
   
   
   # Count unique functional groups rates
@@ -280,9 +279,9 @@ glimpse(datFinal)
     mutate(countFuncGrp = sum(funcGrp > 1, na.rm = TRUE)) %>% 
     distinct(funcGrp, countFuncGrp) %>% 
     arrange(countFuncGrp)
-    # GelFilter             34
-    # GelPreds             226
-    # Crustaceans          424
+    # 1 GelFilter             34
+    # 2 GelPreds             181
+    # 3 Crustaceans          273
   
   
   # Count unique size groups rates
@@ -291,8 +290,8 @@ glimpse(datFinal)
     mutate(countSizeGrp = sum(sizeGrp > 1, na.rm = TRUE)) %>% 
     distinct(sizeGrp, countSizeGrp) %>% 
     arrange(countSizeGrp)
-    # Mesoplankton           313
-    # Macroplankton          371
+    # 1 Mesoplankton           154
+    # 2 Macroplankton          334
   
   
   # Check the temperature range for each zoopGrp

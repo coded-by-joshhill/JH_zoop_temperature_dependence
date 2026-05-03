@@ -84,11 +84,11 @@ convert_ingestion <- function(rate, unit) {
 # Estimate growth
 calcGrowthRate <- function(mass1, mass0, time) {
   # Following McConville and colleagues (2017), estimate growth using:
-  # G = (M1 - M0) / t
-  # Where M1 is mass at a time, M0 is mass at the previous time point, and t is the time period between the two measurements
-  G = (mass1 - mass0) / time
+  # Relative Growth Rate (RGR) = (log(M1) - log(M0)) / t
+  # Where M1 is mass at a time, M0 is mass at the previous time point, and t is the time period (delta time) between the two measurements
+  RGR = (log(mass1) - log(mass0)) / time
   
-  return(G)
+  return(RGR)
 }
 # END OF GROWTH CALCULATOR
 

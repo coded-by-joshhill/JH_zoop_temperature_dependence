@@ -152,7 +152,7 @@ m2 <- glmmTMB(ln_Cspecific_rate ~
                 temp_C * rate_name + # interactions between temp and different rates across all zooplankton
                 temp_C * funcGrp +  # between temp and different funcGrps for all rates
                 rate_name * funcGrp + # between rates and funcGrp 
-                (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
+                (temp_C | primRef) + (1 | taxa), # with primRef and taxa as random intercepts and slopes
               data = mdat) 
 
   # Check diagnostics
@@ -318,13 +318,14 @@ funcGQ10plot
 library(ggbreak) # to break y-axis on massive Q10 variance
 funcG10plot_break <- funcGQ10plot +
   geom_text(data = filter(funcGrp_slopes_Q10, 
-                          (rate_name == "Ingestion" & Q10_upr > 8) |
-                          (rate_name == "Respiration" & Q10_upr > 8) |
-                          (rate_name == "Clearance" & Q10_upr > 8)),
-            aes(x = funcGrp, y = 7.85, label = paste0("↑ ", round(Q10_upr, 0))),
+                          (rate_name == "Ingestion" & Q10_upr > 6) |
+                          (rate_name == "Respiration" & Q10_upr > 6) |
+                          (rate_name == "Growth" & Q10_upr > 6) |
+                          (rate_name == "Clearance" & Q10_upr > 6)),
+            aes(x = funcGrp, y = 5.85, label = paste0("↑ ", round(Q10_upr, 0))),
             colour = "grey40", size = 4,
             nudge_x = 0.3) +
-  coord_cartesian(ylim = c(-1, 8))
+  coord_cartesian(ylim = c(-1, 6))
 funcG10plot_break
 
 tempPlot/funcG10plot_break

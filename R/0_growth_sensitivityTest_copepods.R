@@ -40,7 +40,7 @@ primRefPlot <- grwdat %>%
   labs(x = "Temperature (°C)",
        y = expression("ln Growth rate (mgC mgC"^-1*" h"^-1*")"))
 primRefPlot
-ggsave("Output/GrowthTests/primRefPlot.pdf", primRefPlot, width = 400, height = 220, units = "mm", dpi = 300)
+#ggsave("Output/GrowthTests/primRefPlot.pdf", primRefPlot, width = 400, height = 220, units = "mm", dpi = 300)
 
 # Look at body mass to rate ----
 # Temperature normalisation using Q10 = 2
