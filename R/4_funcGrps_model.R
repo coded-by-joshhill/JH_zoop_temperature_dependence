@@ -152,7 +152,7 @@ m2 <- glmmTMB(ln_Cspecific_rate ~
                 temp_C * rate_name + # interactions between temp and different rates across all zooplankton
                 temp_C * funcGrp +  # between temp and different funcGrps for all rates
                 rate_name * funcGrp + # between rates and funcGrp 
-                (temp_C | primRef) + (1 | taxa), # with primRef and taxa as random intercepts and slopes
+                (temp_C | primRef) + (1 | taxa), # with primRef and taxa as random intercepts and slopes (only slope for taxa, because model did not converge)
               data = mdat) 
 
   # Check diagnostics

@@ -181,9 +181,17 @@ n_obs <- mdat %>%
 
 # Get Q10
 slopes_Q10 <- as.data.frame(slopes) %>% 
-  mutate(Q10 = round(exp(10 * temp_C.trend), digits = 2),
+  # Calculate Q10s
+  mutate(Q10 = round(exp(10* temp_C.trend), digits = 2),
          Q10_lwr = round(exp(10 * asymp.LCL), digits = 2),
          Q10_upr = round(exp(10 * asymp.UCL), digits = 2)) %>% 
+  # Calculate equivalent activation energies (Ea)
+  mutate(refT = 15 + 273.15, # reference temp in Kelvin
+         k = 8.617e-5, # Boltzmann's constant as eV/K-1
+         FCon = 96.485, # Faraday constant as C/mol-1
+         Ea_eV = k * log(Q10) * (refT * (refT + 10)) / 10, # Ea as eV
+         Ea_kJ.mol  = Ea_eV * FCon) %>% # Ea as kJ/mol-1
+  select(- c(k, FCon, df, refT, asymp.LCL, asymp.UCL)) %>% 
   left_join(n_obs, by = "rate_name")
 slopes_Q10
 

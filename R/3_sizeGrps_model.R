@@ -184,7 +184,7 @@ summary(m1)
 sizeGrp_slopes <- emtrends(m1, ~ rate_name * sizeGrp, var = "temp_C")
 summary(sizeGrp_slopes, infer = TRUE) # test whether each slope is different from zero for each sizeGrp
 emmeans::contrast(sizeGrp_slopes, by = "rate_name", method = "pairwise", adjustment = "none") # pairwise test whether slopes differ significantly across rate types and grps
-  # yes, some slightly significant differences
+  # yes, clearance: meso-macro
 
 # Get n
 n_obs <- mdat %>%
@@ -192,10 +192,19 @@ n_obs <- mdat %>%
 
 # Get Q10
 sizeGrp_slopes_Q10 <- as.data.frame(sizeGrp_slopes) %>% 
+  # Calculate Q10s
   mutate(Q10 = round(exp(10* temp_C.trend), digits = 2),
          Q10_lwr = round(exp(10 * asymp.LCL), digits = 2),
          Q10_upr = round(exp(10 * asymp.UCL), digits = 2)) %>% 
+  # Calculate equivalent activation energies (Ea)
+  mutate(refT = 15 + 273.15, # reference temp in Kelvin
+    k = 8.617e-5, # Boltzmann's constant as eV/K-1
+    FCon = 96.485, # Faraday constant as C/mol-1
+    Ea_eV = k * log(Q10) * (refT * (refT + 10)) / 10, # Ea as eV
+    Ea_kJ.mol  = Ea_eV * FCon) %>% # Ea as kJ/mol-1
+  
   left_join(n_obs, by = c("rate_name", "sizeGrp")) %>% 
+  select(- c(k, FCon, df, refT, asymp.LCL, asymp.UCL)) %>% 
   arrange(rate_name, sizeGrp)
 sizeGrp_slopes_Q10
 
