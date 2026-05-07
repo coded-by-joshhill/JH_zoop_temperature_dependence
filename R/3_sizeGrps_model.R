@@ -198,16 +198,15 @@ sizeGrp_slopes_Q10 <- as.data.frame(sizeGrp_slopes) %>%
          Q10_upr = round(exp(10 * asymp.UCL), digits = 2)) %>% 
   # Calculate equivalent activation energies (Ea)
   mutate(refT = 15 + 273.15, # reference temp in Kelvin
-    k = 8.617e-5, # Boltzmann's constant as eV/K-1
-    FCon = 96.485, # Faraday constant as C/mol-1
-    Ea_eV = k * log(Q10) * (refT * (refT + 10)) / 10, # Ea as eV
-    Ea_kJ.mol  = Ea_eV * FCon) %>% # Ea as kJ/mol-1
-  
+         k = 8.617e-5, # Boltzmann's constant as eV/K-1
+         R = 8.314 / 1000, # Ideal gas constant as kJ mol-1
+         Ea_eV = k * log(Q10) * (refT * (refT + 10)) / 10, # Ea as eV
+         Ea_kJ.mol =  (R) * log(Q10) * (refT * (refT + 10)) / 10 # Ea as kJ/mol-1
+         ) %>%
+  select(- c(k, R, df, refT, asymp.LCL, asymp.UCL)) %>%
   left_join(n_obs, by = c("rate_name", "sizeGrp")) %>% 
-  select(- c(k, FCon, df, refT, asymp.LCL, asymp.UCL)) %>% 
   arrange(rate_name, sizeGrp)
 sizeGrp_slopes_Q10
-
 
 
 
@@ -245,15 +244,16 @@ PlotLMM = function(model){
 
     # Plot it up...
   ggplot() +
+    geom_point(data = mdat,
+               aes(x = temp_C, y = ln_Cspecific_rate, colour = sizeGrp),
+               alpha = 0.2) +
     geom_ribbon(data = pop_preds,
                 aes(x = temp_C, ymin = conf.low, ymax = conf.high, fill = sizeGrp),
                 alpha = 0.25) +
     geom_line(data = pop_preds,
               aes(x = temp_C, y = estimate, colour = sizeGrp),
               linewidth = 1) +
-    geom_point(data = mdat,
-               aes(x = temp_C, y = ln_Cspecific_rate, colour = sizeGrp),
-               alpha = 0.2) +
+
     facet_wrap(~rate_name, scales = "free",
                labeller = as_labeller(c(
                  "Clearance"   = "bold(Clearance~rate~(ml~mgC^-1~h^-1))",
@@ -262,8 +262,8 @@ PlotLMM = function(model){
                  "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))"
                ), 
                label_parsed))+ 
-    scale_fill_manual(values = grp_cols, labels = c("Mesoplankton", "Macroplankton")) +
-    scale_colour_manual(values = grp_cols, labels = c("Mesoplankton", "Macroplankton")) +
+    scale_fill_manual(values = grp_cols, labels = c("Mesozooplankton", "Macrozooplankton")) +
+    scale_colour_manual(values = grp_cols, labels = c("Mesozooplankton", "Macrozooplankton")) +
     coord_cartesian(xlim = c(-2, 32)) +
     labs(x = "Temp (°C)",
          y = "ln(Carbon-mass specific rate)",
@@ -311,16 +311,16 @@ sizeGQ10plot <- ggplot() +
                "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))"
              ), 
              label_parsed)) + 
-  scale_colour_manual(values = grp_cols, labels = c("Mesoplankton", "Macroplankton")) +
+  scale_colour_manual(values = grp_cols, labels = c("Mesozooplankton", "Macrozooplankton")) +
   labs(x = "Size group",
        y = bquote(bold("Carbon-mass specific Q"[10])),
        colour = "Size group") +
+  scale_x_discrete(labels = c("Mesozooplankton", "Macrozooplankton")) +
   theme(
     strip.background = element_rect(fill = "whitesmoke", colour = "black"),
     axis.title = element_text(size = 11, face = "bold"),
     axis.text = element_text(size = 10),
-    legend.position = "none"
-  )
+    legend.position = "none")
 sizeGQ10plot
 
 

@@ -46,7 +46,7 @@ repDatClean <- repDat %>%
   group_by(primRef, taxa, temp_C, BM_C) %>% # group the data by study, taxon, and associated temp and carbon mass
   slice_max(rate_value, n = 1, with_ties = FALSE) %>% # slice the maximum rate value from that data
   ungroup()
-  # Unfortunately we lose a bit of data...
+  # Unfortunately we lose a bit of data...~50
 
 
 # Compress clearance data to minimum rates for each study as above...

@@ -1,6 +1,6 @@
 # Calculating zoopGrps Q10s
 # Josh Hill
-# 13/03/2026
+# 5/05/2026
 
 
 
@@ -94,30 +94,6 @@ usedat %>%
     # wont be able to get estimates for amphipods, decapods, mysids, annelids, molluscs
 
 
-# Quickly view distribution of raw Cspecific_rates
-# I will use these to remove extreme outliers, particularly those that don't make biological sense
-usedat %>%
-  ggplot() +
-  geom_point(aes(x = temp_C, y = Cspecific_rate)) +
-  theme_bw() +
-  facet_wrap(~ rate_name, scales = "free") + 
-  labs(
-    x = "Temp C",
-    y = "Clearance rate")
-
-
-usedat %>%
-  ggplot(aes(x = log(Cspecific_rate))) + # log because we will transform the data for analysis
-  geom_histogram(bins = 50, fill = "pink", colour = "grey") +
-  theme_bw() +
-  facet_wrap(~rate_name, scales = "free") +
-  labs(
-    x = "Mass-specific rate (Cspecific_rate, log scale)",
-    y = "Count",
-    title = "Distribution of Cspecific_rate across all zooplankton")
-    # distribution looks pretty normal but ingestion and clearance are slightly left skewed
-
-
 
 # Prep data for modelling ----
 mdat <- usedat %>%
@@ -155,12 +131,8 @@ m1 <- glmmTMB(ln_Cspecific_rate ~
                 (temp_C | primRef) + (1 | taxa), # with primRef and taxa as random intercepts and slopes
               data = mdat)
 
-  # Check diagnostics
-  sim <- simulateResiduals(m1)
-  plot(sim) # looks pretty good
-  summary(m1)
-
 # Columns are being dropped from rank-deficient conditional model - probably not enough data for a few groups across all rates
+
 # Lets check the counts for each fixed effect before progressing
   
   # Are all zoopGrp levels present across all rate types?
@@ -175,7 +147,7 @@ m1 <- glmmTMB(ln_Cspecific_rate ~
 mdat %>%
   count(rate_name, zoopGrp) %>%
   pivot_wider(names_from = zoopGrp, values_from = n, values_fill = 0)
-  # 9 rate to group combinations lacking data to estimate coefficients
+  # rate to group combinations lacking data to estimate coefficients
 
 # Because there are many zeros across the groups and rates...I will fit per-rate models to estimate temperature dependence for available groups
 
@@ -245,9 +217,18 @@ n_obs_clearance <- d_clearance %>%
   count(zoopGrp)
 
 clearanceQ10 <- as.data.frame(clear_slopes) %>% 
+  # Calculate Q10s
   mutate(Q10 = round(exp(10* temp_C.trend), digits = 2),
          Q10_lwr = round(exp(10 * asymp.LCL), digits = 2),
          Q10_upr = round(exp(10 * asymp.UCL), digits = 2)) %>% 
+  # Calculate equivalent activation energies (Ea)
+  mutate(refT = 15 + 273.15, # reference temp in Kelvin
+         k = 8.617e-5, # Boltzmann's constant as eV/K-1
+         R = 8.314 / 1000, # Ideal gas constant as kJ mol-1
+         Ea_eV = k * log(Q10) * (refT * (refT + 10)) / 10, # Ea as eV
+         Ea_kJ.mol =  (R) * log(Q10) * (refT * (refT + 10)) / 10 # Ea as kJ/mol-1
+  ) %>%
+  select(- c(k, R, df, refT, asymp.LCL, asymp.UCL)) %>%
   left_join(n_obs_clearance, by = "zoopGrp")
 clearanceQ10
 
@@ -255,7 +236,7 @@ clearanceQ10
 # Ingestion
 ingest_slopes <- emtrends(m_ingestion, ~zoopGrp, var = "temp_C")
 summary(ingest_slopes, infer = TRUE) # test whether each slope is different from zero for each zoopGrp
-pairs(ingest_slopes, method = "pairwise", adjust = "mvt")
+emmeans::contrast(ingest_slopes, method = "pairwise", adjust = "mvt")
   # No sig differences between any groups for ingestion rate
 
 # Get n
@@ -263,9 +244,18 @@ n_obs_ingestion <- d_ingestion %>%
   count(zoopGrp)
 
 ingestionQ10 <- as.data.frame(ingest_slopes) %>% 
+  # Calculate Q10s
   mutate(Q10 = round(exp(10* temp_C.trend), digits = 2),
          Q10_lwr = round(exp(10 * asymp.LCL), digits = 2),
          Q10_upr = round(exp(10 * asymp.UCL), digits = 2)) %>% 
+  # Calculate equivalent activation energies (Ea)
+  mutate(refT = 15 + 273.15, # reference temp in Kelvin
+         k = 8.617e-5, # Boltzmann's constant as eV/K-1
+         R = 8.314 / 1000, # Ideal gas constant as kJ mol-1
+         Ea_eV = k * log(Q10) * (refT * (refT + 10)) / 10, # Ea as eV
+         Ea_kJ.mol =  (R) * log(Q10) * (refT * (refT + 10)) / 10 # Ea as kJ/mol-1
+  ) %>%
+  select(- c(k, R, df, refT, asymp.LCL, asymp.UCL)) %>%
   left_join(n_obs_ingestion, by = "zoopGrp")
 ingestionQ10
 
@@ -273,19 +263,28 @@ ingestionQ10
 # Growth
 growth_slopes <- emtrends(m_growth, ~zoopGrp, var = "temp_C")
 summary(growth_slopes, infer = TRUE)# test whether each slope is different from zero for each zoopGrp
-pairs(growth_slopes, method = "pairwise", adjust = "mvt")
-  # ctenophores - copepods
-  # cnidarians - copepods
-  # chaetognaths - copepods
+emmeans::contrast(growth_slopes, method = "pairwise", adjust = "mvt")
+  # Cnidarians - Amphipods
+  # Cnidarians - Copepods 
+  # Marginally significant Cnidarians - Euphausiids
 
 # Get n
 n_obs_growth <- d_growth %>%
   count(zoopGrp)
 
 growthQ10 <- as.data.frame(growth_slopes) %>% 
+  # Calculate Q10s
   mutate(Q10 = round(exp(10* temp_C.trend), digits = 2),
          Q10_lwr = round(exp(10 * asymp.LCL), digits = 2),
          Q10_upr = round(exp(10 * asymp.UCL), digits = 2)) %>% 
+  # Calculate equivalent activation energies (Ea)
+  mutate(refT = 15 + 273.15, # reference temp in Kelvin
+         k = 8.617e-5, # Boltzmann's constant as eV/K-1
+         R = 8.314 / 1000, # Ideal gas constant as kJ mol-1
+         Ea_eV = k * log(Q10) * (refT * (refT + 10)) / 10, # Ea as eV
+         Ea_kJ.mol =  (R) * log(Q10) * (refT * (refT + 10)) / 10 # Ea as kJ/mol-1
+  ) %>%
+  select(- c(k, R, df, refT, asymp.LCL, asymp.UCL)) %>%
   left_join(n_obs_growth, by = "zoopGrp")
 growthQ10
 
@@ -293,7 +292,7 @@ growthQ10
 # Respiration
 resp_slopes <- emtrends(m_respiration, ~zoopGrp, var = "temp_C")
 summary(resp_slopes, infer = TRUE) # test whether each slope is different from zero for each zoopGrp
-pairs(resp_slopes, method = "pairwise", adjust = "mvt")
+emmeans::contrast(resp_slopes, method = "pairwise", adjust = "mvt")
   # ctenophores - cnidarians
   # cnidarians- copepods
   # cnidarians - euphausiids
@@ -303,9 +302,18 @@ n_obs_respiration <- d_respiration %>%
   count(zoopGrp)
 
 respQ10 <- as.data.frame(resp_slopes) %>% 
+  # Calculate Q10s
   mutate(Q10 = round(exp(10* temp_C.trend), digits = 2),
          Q10_lwr = round(exp(10 * asymp.LCL), digits = 2),
          Q10_upr = round(exp(10 * asymp.UCL), digits = 2)) %>% 
+  # Calculate equivalent activation energies (Ea)
+  mutate(refT = 15 + 273.15, # reference temp in Kelvin
+         k = 8.617e-5, # Boltzmann's constant as eV/K-1
+         R = 8.314 / 1000, # Ideal gas constant as kJ mol-1
+         Ea_eV = k * log(Q10) * (refT * (refT + 10)) / 10, # Ea as eV
+         Ea_kJ.mol =  (R) * log(Q10) * (refT * (refT + 10)) / 10 # Ea as kJ/mol-1
+  ) %>%
+  select(- c(k, R, df, refT, asymp.LCL, asymp.UCL)) %>%
   left_join(n_obs_respiration, by = "zoopGrp")
 respQ10
 
@@ -358,21 +366,22 @@ PlotLMM = function(model, data){
 
     # Plot it up...
   ggplot() +
+    geom_point(data = data,
+               aes(x = temp_C, y = ln_Cspecific_rate, colour = zoopGrp),
+               alpha = 0.2) +
     geom_ribbon(data = pop_preds,
                 aes(x = temp_C, ymin = conf.low, ymax = conf.high, fill = zoopGrp),
                 alpha = 0.25) +
     geom_line(data = pop_preds,
               aes(x = temp_C, y = estimate, colour = zoopGrp),
               linewidth = 1) +
-    geom_point(data = data,
-               aes(x = temp_C, y = ln_Cspecific_rate, colour = zoopGrp),
-               alpha = 0.2) +
     coord_cartesian(xlim = c(-2, 32)) +
     labs(x = "Temp (°C)",
          fill = "Taxonomic group",
          colour = "Taxonomic group") +
     scale_fill_manual(values = grp_cols) +
     scale_colour_manual(values = grp_cols) +
+    scale_x_continuous(breaks = c(0, 15, 30)) +
     theme_bw() +
     theme(
       strip.background = element_rect(fill = "whitesmoke", colour = "black"),
@@ -486,7 +495,7 @@ ingQ10plot
 growQ10plot <- ggplot() +
   geom_errorbar(data = growthQ10, 
                 aes(x = zoopGrp, ymin = Q10_lwr, ymax = Q10_upr, colour = zoopGrp),
-                width = .05,
+                width = .09,
                 linewidth = 1) +
   geom_point(data = growthQ10, aes(x = zoopGrp, y = Q10),
              size = 3,
@@ -513,6 +522,7 @@ library(ggbreak) # to break y-axis on massive Q10 variance
 growQ10plot_break <- growQ10plot +
   geom_text(data = filter(growthQ10, 
                           (zoopGrp == "Decapods" & Q10_upr > 2) |
+                          (zoopGrp == "Euphausiids" & Q10_upr > 2) |
                           (zoopGrp == "Thaliaceans" & Q10_upr > 2)),
             aes(x = zoopGrp, y = 5.5, label = paste0("↑ ", round(Q10_upr, 1))),
             colour = "grey40", size = 4,
@@ -525,7 +535,7 @@ growQ10plot_break
 respQ10plot <- ggplot() +
   geom_errorbar(data = respQ10, 
                 aes(x = zoopGrp, ymin = Q10_lwr, ymax = Q10_upr, colour = zoopGrp),
-                width = .05,
+                width = .07,
                 linewidth = 1) +
   geom_point(data = respQ10, aes(x = zoopGrp, y = Q10),
              size = 3,
@@ -586,7 +596,7 @@ ggsave("Output/Figure5/Figure5_legend.pdf", legend, width = 180, height = 180, u
 
 
 # Save it
-ggsave("Output/Figure5/FigureS1_tempPlot.pdf", tempPlots, width = 160, height = 170, units = "mm", dpi = 300)
-ggsave("Output/Figure5/FigureS1_tempPlot.png", tempPlots, width = 160, height = 170, units = "mm", dpi = 300)
+ggsave("Output/Figure5/FigureS1_tempPlot.pdf", tempPlots, width = 170, height = 180, units = "mm", dpi = 300)
+ggsave("Output/Figure5/FigureS1_tempPlot.png", tempPlots, width = 170, height = 180, units = "mm", dpi = 300)
 
 

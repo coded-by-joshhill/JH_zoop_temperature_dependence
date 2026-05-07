@@ -1,6 +1,6 @@
 # Calculating funcGrps Q10s
 # Josh Hill
-# 03/11/2026
+# 05/05/2026
 
 
 
@@ -181,11 +181,8 @@ summary(m1)
 # Extract slopes using and calculate Q10 for each funcGrp ----
 funcGrp_slopes <- emtrends(m1, ~ rate_name * funcGrp, var = "temp_C")
 summary(funcGrp_slopes, infer = TRUE) # test whether each slope is different from zero for each zoopGrp
-pairs(funcGrp_slopes, by = "rate_name") # pairwise test whether slopes differ significantly across rate types and grps
-# yes, some slightly significant differences for:
-  # Clearance - crust - gelPreds
-  # Clearance - crust - gelFilter
-  # Growth - crust - gelPreds
+emmeans::contrast(funcGrp_slopes, by = "rate_name", method = "pairwise", adjustment = "mvt") # pairwise test whether slopes differ significantly across rate types and grps
+
 
 # Get n
 n_obs <- mdat %>%
@@ -193,9 +190,18 @@ n_obs <- mdat %>%
 
 # Get Q10
 funcGrp_slopes_Q10 <- as.data.frame(funcGrp_slopes) %>% 
+  # Calculate Q10s
   mutate(Q10 = round(exp(10* temp_C.trend), digits = 2),
          Q10_lwr = round(exp(10 * asymp.LCL), digits = 2),
          Q10_upr = round(exp(10 * asymp.UCL), digits = 2)) %>% 
+  # Calculate equivalent activation energies (Ea)
+  mutate(refT = 15 + 273.15, # reference temp in Kelvin
+         k = 8.617e-5, # Boltzmann's constant as eV/K-1
+         R = 8.314 / 1000, # Ideal gas constant as kJ mol-1
+         Ea_eV = k * log(Q10) * (refT * (refT + 10)) / 10, # Ea as eV
+         Ea_kJ.mol =  (R) * log(Q10) * (refT * (refT + 10)) / 10 # Ea as kJ/mol-1
+         ) %>%
+  select(- c(k, R, df, refT, asymp.LCL, asymp.UCL)) %>%
   left_join(n_obs, by = c("rate_name", "funcGrp")) %>% 
   arrange(rate_name, funcGrp)
 funcGrp_slopes_Q10
@@ -238,15 +244,15 @@ PlotLMM = function(model){
 
     # Plot it up...
   ggplot() +
+    geom_point(data = mdat,
+               aes(x = temp_C, y = ln_Cspecific_rate, colour = funcGrp),
+               alpha = 0.2) +
     geom_ribbon(data = pop_preds,
                 aes(x = temp_C, ymin = conf.low, ymax = conf.high, fill = funcGrp),
                 alpha = 0.25) +
     geom_line(data = pop_preds,
               aes(x = temp_C, y = estimate, colour = funcGrp),
               linewidth = 1) +
-    geom_point(data = mdat,
-               aes(x = temp_C, y = ln_Cspecific_rate, colour = funcGrp),
-               alpha = 0.2) +
     facet_wrap(~rate_name, scales = "free",
                labeller = as_labeller(c(
                  "Clearance"   = "bold(Clearance~rate~(ml~mgC^-1~h^-1))",

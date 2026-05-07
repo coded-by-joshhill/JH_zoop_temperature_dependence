@@ -186,12 +186,13 @@ slopes_Q10 <- as.data.frame(slopes) %>%
          Q10_lwr = round(exp(10 * asymp.LCL), digits = 2),
          Q10_upr = round(exp(10 * asymp.UCL), digits = 2)) %>% 
   # Calculate equivalent activation energies (Ea)
-  mutate(refT = 15 + 273.15, # reference temp in Kelvin
+  mutate(refT = 15 + 273.15, # reference temp (15degC) in Kelvin
          k = 8.617e-5, # Boltzmann's constant as eV/K-1
-         FCon = 96.485, # Faraday constant as C/mol-1
+         R = 8.314 / 1000, # Ideal gas constant as kJ mol-1
          Ea_eV = k * log(Q10) * (refT * (refT + 10)) / 10, # Ea as eV
-         Ea_kJ.mol  = Ea_eV * FCon) %>% # Ea as kJ/mol-1
-  select(- c(k, FCon, df, refT, asymp.LCL, asymp.UCL)) %>% 
+         Ea_kJ.mol =  (R) * log(Q10) * (refT * (refT + 10)) / 10 # Ea as kJ/mol-1
+         ) %>%
+  select(- c(k, R, df, refT, asymp.LCL, asymp.UCL)) %>% 
   left_join(n_obs, by = "rate_name")
 slopes_Q10
 
@@ -235,7 +236,6 @@ PlotLMM = function(model){
     geom_line(data = pop_preds,
               aes(x = temp_C, y = estimate), colour = "midnightblue",
               linewidth = 1) +
-
     facet_wrap(~rate_name, scales = "free",
                labeller = as_labeller(c(
                  "Clearance"   = "bold(Clearance~rate~(ml~mgC^-1~h^-1))",
