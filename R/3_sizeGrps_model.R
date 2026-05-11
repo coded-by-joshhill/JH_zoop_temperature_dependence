@@ -186,6 +186,25 @@ summary(sizeGrp_slopes, infer = TRUE) # test whether each slope is different fro
 emmeans::contrast(sizeGrp_slopes, by = "rate_name", method = "pairwise", adjustment = "none") # pairwise test whether slopes differ significantly across rate types and grps
   # yes, clearance: meso-macro
 
+
+# Extract intercepts ----
+sizeGrp_intercepts <- data.frame(emmeans(m1, ~ rate_name * sizeGrp, var = "temp_C"))
+
+
+
+# Build a parameter dataframe and to estimate ratios
+params <- data.frame(sizeGrp_slopes) %>% 
+  rename(slope = temp_C.trend) %>% 
+  select(-c(SE, df, asymp.LCL, asymp.UCL)) %>% 
+  left_join(sizeGrp_intercepts) %>% 
+  rename(intercept = emmean) %>% 
+  select(-c(SE, df, asymp.LCL, asymp.UCL))
+
+
+# Save the parameter data for later, we'll use this to estimate ratios of the terms
+#saveRDS(params, file = "Data/modelParameters/sizeGrpestimates.rds")
+
+
 # Get n
 n_obs <- mdat %>%
   count(rate_name, sizeGrp)

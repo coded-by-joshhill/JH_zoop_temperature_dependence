@@ -175,6 +175,24 @@ emmeans::contrast(slopes, method = "pairwise", adjust = "mvt") # pairwise test w
   # clearance - ingest
   # clearance - growth
 
+
+# Extract intercepts ----
+intercepts <- data.frame(emmeans(m1, ~ rate_name, var = "temp_C"))
+
+
+# Build a parameter dataframe and to estimate ratios
+params <- data.frame(slopes) %>% 
+  rename(slope = temp_C.trend) %>% 
+  select(-c(SE, df, asymp.LCL, asymp.UCL)) %>% 
+  left_join(intercepts) %>% 
+  rename(intercept = emmean) %>% 
+  select(-c(SE, df, asymp.LCL, asymp.UCL))
+  
+
+# Save the parameter data for later, we'll use this to estimate ratios of the terms
+saveRDS(params, file = "Data/modelParameters/allZestimates.rds")
+
+
 # Get n_obs
 n_obs <- mdat %>%
   count(rate_name)
@@ -306,7 +324,6 @@ fig2 <- tempPlot/allZoopQ10plot +
 fig2
 
 
-# Save the plots
-ggsave("Output/Figure2/Figure2_tempPlot.pdf", tempPlot, width = 160, height = 150, units = "mm", dpi = 300)
-ggsave("Output/Figure2/Figure2_Q10Plot.pdf", allZoopQ10plot, width = 160, height = 70, units = "mm", dpi = 300)
-
+# Save the plots ----
+# ggsave("Output/Figure2/Figure2_tempPlot.pdf", tempPlot, width = 160, height = 150, units = "mm", dpi = 300)
+# ggsave("Output/Figure2/Figure2_Q10Plot.pdf", allZoopQ10plot, width = 160, height = 70, units = "mm", dpi = 300)

@@ -108,7 +108,7 @@ convert_respiration <- function(rate, unit, genus) {
   
   # Stoichiometry
   if (genus == "Euphausia" & unit == "ugC/ind/day") 
-    return(list(rate = ((rate / 24) / (12.011 * 0.9)) * 22.4,         unit = "ulO2/ind/hr")) # μgC to μlO2, where 0.9 = RQ (Ross1982), day to hr
+    return(list(rate = ((rate / 24) / (12.011 * 0.9)) * 22.4,         unit = "ulO2/ind/hr")) # μgC to μlO2, where 0.9 = RQ (Ross1982), day to hr, 22.4 = uL/umol as molar volume of oxygen and 12.011 is ug/umol of molar mass carbon
   
   return(list(rate = NA_real_, unit = NA_character_))
 }
@@ -133,4 +133,33 @@ summarise_taxonomic_coverage <- function(data, dataset_name) {
   return(coverage)
 }
 # END OF TAXONOMIC SUMMARY FUNCTION
+
+
+
+# GROSS GROWTH EFFICIENCY CALCULATOR ----
+calcGGE <- function(params) {
+  # Solving y = mx + b for each physiological rate
+  # where, m = slope, b = intercept
+  # x = 15degC (i.e., mid point of our temp plots)
+  # and GGE = Growth : Ingestion
+  # Note, our estimates are log-transformed rate data, so we will need to back-transform
+  
+  # Get growth parameters
+  G <- params %>% 
+    filter(rate_name == "Growth")
+  
+  # Get ingestion paramaters
+  I <- params %>% 
+    filter(rate_name == "Ingestion")
+  
+  # Back-transform with exp() before calculating the ratio because my response was log-transformed
+  GGE <- exp((G$slope * 15) + (G$intercept)) / exp((I$slope * 15) + (I$intercept))
+  
+  return(GGE)
+  
+}
+# END OF GGE CALCULATOR
+
+
+
 
