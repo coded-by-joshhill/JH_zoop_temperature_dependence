@@ -58,12 +58,19 @@ respdat <- readRDS("Data/resp_dat.rds") %>%
   mutate(rate_name = factor("Respiration"))
 
 
+# Excretion data
+excredat <- readRDS("Data/excrete_dat.rds") %>% 
+  select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
+  drop_na(Cspecific_rate) %>% 
+  mutate(rate_name = factor("Excretion"))
+
+
 # Custom grouping order
 group_order <- c("Mesoplankton", "Macroplankton") # meso before macro because they're smaller
 
 
 # Combine them into one dataframe
-usedat <- rbind(cleardat, ingdat, grwdat, respdat) %>% 
+usedat <- rbind(cleardat, ingdat, grwdat, respdat, excredat) %>% 
   filter_out(sizeGrp == "OTHER" | is.na(temp_C)) %>%  # filter out the size group "OTHER" and remove any NAs in temp_C
   mutate(sizeGrp = fct_relevel(sizeGrp, group_order)) # reorder sizeGrp
   
@@ -76,31 +83,6 @@ usedat %>%
     temp_range = paste0(min(temp_C), "-", max(temp_C))) %>% 
   arrange(rate_name, sizeGrp)
   # looks good
-
-
-# Quickly view distribution of raw Cspecific_rates
-# I will use these to remove extreme outliers, particularly those that don't make biological sense
-usedat %>%
-  ggplot() +
-  geom_point(aes(x = temp_C, y = Cspecific_rate)) +
-  theme_bw() +
-  facet_wrap(~ rate_name, scales = "free") + 
-  labs(
-    x = "Temp C",
-    y = "Clearance rate")
-
-
-usedat %>%
-  # exclude values that are not biologically reasonable or are extreme outliers
-  ggplot(aes(x = log(Cspecific_rate))) + # log because we will transform the data for analysis
-  geom_histogram(bins = 50, fill = "pink", colour = "grey") +
-  theme_bw() +
-  facet_wrap(~rate_name, scales = "free") +
-  labs(
-    x = "Mass-specific rate (Cspecific_rate, log scale)",
-    y = "Count",
-    title = "Distribution of Cspecific_rate across all zooplankton")
-    # distribution looks pretty normal but ingestion and clearance are slightly left skewed
 
 
 
@@ -137,7 +119,7 @@ summary(mdat)
 # A complex model with 3 way interactions for temp, sizeGrp and rate with random effects
 m1 <- glmmTMB(ln_Cspecific_rate ~ 
                 temp_C * rate_name * sizeGrp + # three-way interaction
-                (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
+                (1 | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
               data = mdat) 
 
   # Check diagnostics
@@ -152,7 +134,7 @@ m2 <- glmmTMB(ln_Cspecific_rate ~
                 temp_C * rate_name + # interactions between temp and different rates across all zooplankton
                 temp_C * sizeGrp +  # between temp and different sizeGrps for all rates
                 rate_name * sizeGrp + # between rates and sizeGrp 
-                (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
+                (1 | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
               data = mdat) 
 
   # Check diagnostics
@@ -183,6 +165,7 @@ summary(m1)
 # Extract slopes using and calculate Q10 for each sizeGrp ----
 sizeGrp_slopes <- emtrends(m1, ~ rate_name * sizeGrp, var = "temp_C")
 summary(sizeGrp_slopes, infer = TRUE) # test whether each slope is different from zero for each sizeGrp
+# yes, all different to zero
 emmeans::contrast(sizeGrp_slopes, by = "rate_name", method = "pairwise", adjustment = "none") # pairwise test whether slopes differ significantly across rate types and grps
   # yes, clearance: meso-macro
 
@@ -278,7 +261,8 @@ PlotLMM = function(model){
                  "Clearance"   = "bold(Clearance~rate~(ml~mgC^-1~h^-1))",
                  "Ingestion"   = "bold(Ingestion~rate~(mgC~mgC^-1~h^-1))",
                  "Growth"      = "bold(Growth~rate~(mgC~mgC^-1~h^-1))",
-                 "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))"
+                 "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))",
+                 "Excretion"   = "bold(Excretion~rate~('mgN-NH'[4]^'+'~mgC^-1~h^-1))"
                ), 
                label_parsed))+ 
     scale_fill_manual(values = grp_cols, labels = c("Mesozooplankton", "Macrozooplankton")) +
@@ -327,7 +311,8 @@ sizeGQ10plot <- ggplot() +
                "Clearance"   = "bold(Clearance~rate~(ml~mgC^-1~h^-1))",
                "Ingestion"   = "bold(Ingestion~rate~(mgC~mgC^-1~h^-1))",
                "Growth"      = "bold(Growth~rate~(mgC~mgC^-1~h^-1))",
-               "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))"
+               "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))",
+               "Excretion"   = "bold(Excretion~rate~('mgN-NH'[4]^'+'~mgC^-1~h^-1))"
              ), 
              label_parsed)) + 
   scale_colour_manual(values = grp_cols, labels = c("Mesozooplankton", "Macrozooplankton")) +
@@ -346,6 +331,6 @@ sizeGQ10plot
 tempPlot/sizeGQ10plot
 
 # Save it
-ggsave("Output/Figure3/Figure3_tempPlot.pdf", tempPlot, width = 160, height = 150, units = "mm", dpi = 300)
-ggsave("Output/Figure3/Figure3_Q10Plot.pdf", sizeGQ10plot, width = 160, height = 120, units = "mm", dpi = 300)
+# ggsave("Output/Figure3/Figure3_tempPlot.pdf", tempPlot, width = 160, height = 150, units = "mm", dpi = 300)
+# ggsave("Output/Figure3/Figure3_Q10Plot.pdf", sizeGQ10plot, width = 160, height = 120, units = "mm", dpi = 300)
 

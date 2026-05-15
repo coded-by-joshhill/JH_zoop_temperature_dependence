@@ -6,7 +6,7 @@
 
   # Here I read in the data
   # Use worrms package to get AphiaID's and taxon classifications
-  # Harmonise weight data to mg
+  # Harmonise mass data to mg
   # Assign unique groupings
   # Convert absolute rates to mass-specific
   # Save as an RDS file
@@ -30,7 +30,7 @@ GoldsteinDat <- read_csv("https://www.dropbox.com/scl/fi/6o7ovfttvc7roz0kc27n1/G
   mutate(BM_C = C_M0_mg, # carbon mass gets the initial weight measurement
          weight_unit = "mg", # update the weight unit
          rate_value = calcGrowthRate(C_M1_mg, C_M0_mg, time_days), # estimate growth rate with function
-         rate_value = rate_value / 24, # convert growth rate to mass specific and to hour
+         rate_value = rate_value / 24, # convert growth rate to hour
          rate_unit = "mgC/mgC/hr") %>% # update the rate unit
   select(-c(C_M1_mg, C_M0_mg, time_days)) # tidy the dataframe and prep for binding
 glimpse(GoldsteinDat)
@@ -45,7 +45,7 @@ LuskowDat <- read_csv("https://www.dropbox.com/scl/fi/uyqkquws5jvw7gfbd95oa/Lusk
          BM_C = C_M0_mg, # carbon mass gets the initial weight measurement (in carbon form)
          weight_unit = "mg", # update the weight unit
          rate_value = calcGrowthRate(C_M1_mg, C_M0_mg, time_days), # estimate growth rate with function
-         rate_value = rate_value / 24, # convert growth rate to mass specific and to hour
+         rate_value = rate_value / 24, # convert growth rate to hour
          rate_unit = "mgC/mgC/hr" # update the rate unit
   ) %>% 
   select(-c(DW_M1_mg, DW_M0_mg, C_M1_mg, C_M0_mg, time_days))
@@ -60,7 +60,7 @@ ReyDat <- read_csv("https://www.dropbox.com/scl/fi/896t9633il9zjkmev423p/Rey2001
          BM_C = C_M0_mg, # carbon mass gets the initial weight measurement
          weight_unit = "mg", # update the weight unit
          rate_value = calcGrowthRate(C_M1_mg, C_M0_mg, time_days), # estimate growth rate with function
-         rate_value = rate_value  / 24, # convert growth rate to mass specific and to hour
+         rate_value = rate_value  / 24, # convert growth rate to hour
          rate_unit = "mgC/mgC/hr" # update the rate unit
   ) %>% 
   select(-c(C_M1_ug, C_M0_ug, C_M1_mg, C_M0_mg, time_days))
@@ -143,14 +143,14 @@ taxaDat <- dat %>%
 datClean <- dat %>% 
     left_join(taxaDat, by = "taxa") %>% 
     rowwise() %>% 
-    mutate(BMC_mg = convert_CW(BM_C, weight_unit)) %>% # harmonize C weight data to mg
+    mutate(BMC_mg = convert_CW(BM_C, weight_unit)) %>% # harmonise C weight data to mg
     ungroup() %>% 
     relocate(c(phylum, class, order, family, genus, species), .before = taxa) %>% 
     relocate(BMC_mg, .after = BM_C) %>% 
     mutate(
       # Create custom size groupings following Grigoratou et al. 2025 Figure 1
       sizeGrp = case_when(
-        # Mesoplankton: 0.2 um - 20 mm
+        # Mesoplankton: 0.2 mm - 20 mm
         phylum == "Chaetognatha"  ~ "Mesoplankton",
         class == "Appendicularia" ~ "Mesoplankton", # grouped here because we only have Oikopleura dioica
         class == "Copepoda"       ~ "Mesoplankton",
@@ -212,13 +212,32 @@ glimpse(datClean)
     
 # Prep data for analysis ----
 datFinal <- datClean %>%
-  # No need to harmoise this data (unless more is added)... so I'll use a simple mutate to maintain naming convention consistency
+  # Estimate dry mass based on the % from Kiorboe's 2013 Table 1 
+  mutate(BM_dry_mg = case_when(zoopGrp == "Appendicularians" ~ BMC_mg / (10.3/100),
+                               zoopGrp == "Chaetognaths" ~ BMC_mg / (36.7/100),
+                               zoopGrp == "Cnidarians"   ~ BMC_mg / (13.2/100),
+                               zoopGrp == "Copepods"     ~ BMC_mg / (48/100),
+                               zoopGrp == "Ctenophores"  ~ BMC_mg / (5.1/100),
+                               zoopGrp == "Euphausiids"  ~ BMC_mg / (41.9/100),
+                               zoopGrp == "Thaliaceans"  ~ BMC_mg / (10.3/100))) %>% 
+  # No need to harmonise this data (unless more is added)... so I'll use a simple mutate to maintain naming convention consistency
+  # Carbon mass-specific rates (i.e., relative growth rates...)
   mutate(Cspecific_rate = rate_value, # rate_value is already mass-specific so merge to consistent naming convention
-         Cspecific_unit = rate_unit, # update the units
-         zoopGrp = as.factor(zoopGrp)) %>% 
+         Cspecific_unit = "mgC/mgC/hr", # update the units
+
+         # Convert to dry-mass specific rates
+         DrySpecific_rate = case_when(
+           rate_name == "GrowthRate" & Cspecific_unit == "mgC/mgC/hr" ~ Cspecific_rate, # value stays the same because it is relative growth rate
+           TRUE ~ NA_real_),
+         DrySpecific_unit = case_when( # update the mass-specific units to match the mass-specific rates...
+           rate_name == "GrowthRate" & !is.na(DrySpecific_rate) ~ "mgDry/mgDry/hr",
+           TRUE ~ Cspecific_unit),
+         sizeGrp = as.factor(sizeGrp),
+         funcGrp = as.factor(funcGrp),  
+         zoopGrp = as.factor(zoopGrp)) %>%
+  select(-c(BM_wet, BM_dry, BM_C, weight_unit, weight_calc)) %>%  # tidy up the dataframe
   relocate(Cspecific_rate, .after = rate_name) %>% 
-  relocate(Cspecific_unit, .after = Cspecific_rate) %>%
-  select(-BM_C)
+  relocate(Cspecific_unit, .after = Cspecific_rate)
   
 glimpse(datFinal)
 
@@ -304,3 +323,5 @@ glimpse(datFinal)
   
 # Save it as an RDS for later use
 # saveRDS(datFinal, "Data/grwth_dat.rds")
+
+  

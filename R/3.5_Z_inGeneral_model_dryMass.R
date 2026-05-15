@@ -32,7 +32,7 @@ dat <- readRDS("Data/clear_ingest_data.rds")
 # Clearance data
 cleardat <- dat %>% 
   filter(rate_name == "ClearanceRate") %>% # Filter for clearance rate
-  select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
+  select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, DrySpecific_rate, temp_C, BMC_mg) %>% 
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Clearance"))
 
@@ -40,21 +40,21 @@ cleardat <- dat %>%
 # Ingestion data
 ingdat <- dat %>% 
   filter(rate_name == "IngestionRate") %>% # Filter for ingestion rate
-  select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
+  select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, DrySpecific_rate, temp_C, BMC_mg) %>% 
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Ingestion"))
 
 
 # Growth data
 grwdat <- readRDS("Data/grwth_dat.rds") %>% 
-  select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
+  select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, DrySpecific_rate, temp_C, BMC_mg) %>% 
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Growth"))
 
 
 # Respiration data
 respdat <- readRDS("Data/resp_dat.rds") %>% 
-  select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
+  select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, DrySpecific_rate, temp_C, BMC_mg) %>% 
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Respiration"))
 
@@ -71,11 +71,11 @@ usedat %>%
     # -1.8-31 degC
 
 
-# Quickly view the distribution of raw Cspecific_rates
+# Quickly view the distribution of raw DM specific rates...
 # I will use these to remove extreme outliers, particularly those that don't make biological sense
 usedat %>%
   ggplot() +
-  geom_point(aes(x = temp_C, y = Cspecific_rate)) +
+  geom_point(aes(x = temp_C, y = DrySpecific_rate)) +
   theme_bw() +
   facet_wrap(~ rate_name, scales = "free") + 
   labs(
@@ -85,27 +85,27 @@ usedat %>%
 
 # Check distribution of data
 usedat %>%
-  ggplot(aes(x = log(Cspecific_rate))) + # log because we will transform the data for analysis
+  ggplot(aes(x = log(DrySpecific_rate))) + # log because we will transform the data for analysis
   geom_histogram(bins = 50, fill = "pink", colour = "grey") +
   theme_bw() +
   facet_wrap(~rate_name, scales = "free") +
   labs(
-    x = "Mass-specific rate (Cspecific_rate, log scale)",
+    x = "Mass-specific rate (DMass_rate, log scale)",
     y = "Count",
-    title = "Distribution of Cspecific_rate across all zooplankton")
+    title = "Distribution of DMspecific rates across all zooplankton")
     # distribution looks pretty normal but ingestion and clearance are slightly left skewed
 
 
 
 # Tidy up data and prep data for modelling ----
 mdat <- usedat %>% 
-  mutate(ln_Cspecific_rate = log(Cspecific_rate)) # log transform mass-specific rate and save as new variable
+  mutate(ln_DMspecific_rate = log(DrySpecific_rate)) # log transform mass-specific rate and save as new variable
 
 
 # Quick look
 mdat %>% 
   ggplot() +
-  geom_point(aes(x = temp_C, y = ln_Cspecific_rate)) +
+  geom_point(aes(x = temp_C, y = ln_DMspecific_rate, colour = zoopGrp)) +
   facet_wrap(~ rate_name, scale = "free") +
   theme_bw()
   # Looks pretty tidy. Some clear relationships here
@@ -121,20 +121,20 @@ summary(mdat)
 # Fit the models ----
 
 # A complex model with 2 way interactions for temp and rate with random slopes and intercepts
-m1 <- glmmTMB(ln_Cspecific_rate ~ 
+m1 <- glmmTMB(ln_DMspecific_rate ~ 
                 temp_C * rate_name + # interactions between temp and different rates across all zooplankton
                 (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
               data = mdat) 
 
   # Check diagnostics
   sim <- simulateResiduals(m1)
-  plot(sim) # looks pretty good
+  plot(sim) # looks ok
   summary(m1)
   # Kind of difficult to interpret I'll use emtrends to extract rate-specific slopes later
 
   
 # A simpler model with only random intercepts
-m2 <- glmmTMB(ln_Cspecific_rate ~ 
+m2 <- glmmTMB(ln_DMspecific_rate ~ 
                 temp_C * rate_name + # interactions between temp and different rates across all zooplankton
                 (1 | primRef) + (1 | taxa), # with primRef and taxa as random intercepts only
               data = mdat)
@@ -164,17 +164,18 @@ anova(m1_m1, m2_m2) # test which random effects structure is a better fit
 summary(m1)
 r.squaredGLMM(m1)
 # R2m       R2c
-# 0.8921226 0.9701256
+# 0.8437258 0.9630264
 
 # Extract slopes and calculate Q10 for all zooplankton ----
 slopes <- emmeans::emtrends(m1, ~ rate_name, var = "temp_C")
 summary(slopes, infer = TRUE) # test whether each slope is different from zero for each zoopGrp
-  # all except growth
+  # all except ingestion
 emmeans::contrast(slopes, method = "pairwise", adjust = "mvt") # pairwise test whether slopes differ significantly across rate types
   # slight difference between clearance-ingestion
   # clearance - ingest
-  # clearance - growth
-
+  # ingest - growth
+  # ingest - respiration
+  
 
 # Extract intercepts ----
 intercepts <- data.frame(emmeans(m1, ~ rate_name, var = "temp_C"))
@@ -190,7 +191,7 @@ params <- data.frame(slopes) %>%
   
 
 # Save the parameter data for later, we'll use this to estimate ratios of the terms
-saveRDS(params, file = "Data/modelParameters/allZestimates.rds")
+# saveRDS(params, file = "Data/modelParameters/allZestimates.rds")
 
 
 # Get n_obs
@@ -246,7 +247,7 @@ PlotLMM = function(model){
     # Plot it up...
   ggplot() +
     geom_point(data = mdat,
-               aes(x = temp_C, y = ln_Cspecific_rate), colour = "grey27",
+               aes(x = temp_C, y = ln_DMspecific_rate), colour = "grey27",
                alpha = 0.2) +
     geom_ribbon(data = pop_preds,
                 aes(x = temp_C, ymin = conf.low, ymax = conf.high), fill = "midnightblue",
@@ -256,15 +257,15 @@ PlotLMM = function(model){
               linewidth = 1) +
     facet_wrap(~rate_name, scales = "free",
                labeller = as_labeller(c(
-                 "Clearance"   = "bold(Clearance~rate~(ml~mgC^-1~h^-1))",
-                 "Ingestion"   = "bold(Ingestion~rate~(mgC~mgC^-1~h^-1))",
-                 "Growth"      = "bold(Growth~rate~(mgC~mgC^-1~h^-1))",
-                 "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))"
+                 "Clearance"   = "bold(Clearance~rate~(ml~mgDM^-1~h^-1))",
+                 "Ingestion"   = "bold(Ingestion~rate~(mgC~mgDM^-1~h^-1))",
+                 "Growth"      = "bold(Growth~rate~(mgDM~mgDM^-1~h^-1))",
+                 "Respiration" = "bold(Respiration~rate~(µlO[2]~mgDM^-1~h^-1))"
                ), 
                label_parsed))+ 
     coord_cartesian(xlim = c(-2, 32)) +
     labs(x = "Temp (°C)",
-         y = "ln (Carbon-mass specific rate)") +
+         y = "ln (Dry-mass specific rate)") +
     theme_bw() +
     theme(
       strip.background = element_rect(fill = "whitesmoke", colour = "black"),
@@ -310,7 +311,7 @@ allZoopQ10plot <- ggplot() +
             size = 3.5, colour = "grey40") +
   scale_fill_manual(values = rate_cols, guide = "none") +
   labs(x = "Biological rate process",
-       y = bquote(bold("Carbon-mass specific Q"[10]))) +
+       y = bquote(bold("Dry-mass specific Q"[10]))) +
   theme(
     axis.title = element_text(size = 11, face = "bold"),
     axis.text = element_text(size = 10)

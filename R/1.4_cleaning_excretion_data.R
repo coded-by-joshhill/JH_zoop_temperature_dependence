@@ -1,6 +1,6 @@
-# Cleaning respiration data
+# Cleaning excretion data
 # Josh Hill
-# 03/02/26
+# 14/05/26
 
 
 
@@ -22,15 +22,31 @@ source("R/0_Helpers.R")
 
 
 # Read in the data ----
-dat <- read_csv("https://www.dropbox.com/scl/fi/itv9vpnu8twxz2fyhmp1u/Resp_dat.csv?rlkey=9fig4vcw2cog4rc4qa6mtj7lj&st=mhqgpuqj&dl=1", 
-                skip = 1) %>%
+dat <- read_csv("https://www.dropbox.com/scl/fi/wqxedgj0omi8byr9c3nkp/Excret_dat.csv?rlkey=r37upcwvf6qtxt38f6m54l9tv&st=u6v5kek8&dl=1") %>%
   mutate(ref_no = if_else(is.na(ref_no) | ref_no == "", # if the value is NA or empty...
                           paste0("Hill_", row_number()), # apply a unique reference number
-                          ref_no), # otherwise keep what is there
-         taxa = str_squish(taxa)) %>% # remove extra spaces from taxon names
-  relocate(ref_no, .before = everything()) %>% # move it before all columns
-  filter_out(data_type == "Mean") # exclude any mean data
-
+                          ref_no) # otherwise keep what is there
+         ) %>% 
+  relocate(ref_no, .before = everything()) %>%  # move it before all columns
+  rename(
+    taxa = scientificName,
+    primRef = primaryReference,
+    primRef_URL = primaryReferenceDOI,
+    secRef = secondaryReference,
+    secRef_URL = secondaryReferenceDOI,
+    rate_value = traitValue,
+    rate_name = traitName,
+    rate_unit = traitUnit,
+    temp_C = assocTemperature
+    ) %>% 
+  mutate(
+    taxa = str_squish(taxa), # remove extra spaces from taxon names
+    taxa = case_when(taxa == "Acartia (Acartiura) clausi" ~ "Acartia (Acartiura) clausii", # fix name...
+                          TRUE ~ taxa)) %>%  # leave the rest as is...
+  # Drop these...Worrms package cannot extact info
+  filter(taxa != "Beroe",
+         taxa != "Beroe cucumis",
+         taxa != "Lucifer")
 
 glimpse(dat)
 
@@ -38,12 +54,11 @@ glimpse(dat)
   # Count number of initial pre-cleaned records
   dat %>% group_by(rate_name) %>% 
     summarise(count = n())
-  # RespirationRate  992
+  #  excretionRateN  2042
 
 
   # Look at all unique taxon
   dat %>% 
-    filter(rate_name == "RespirationRate") %>% 
     distinct(taxa) %>% 
     arrange(taxa) %>% 
     print(n = "Inf")
@@ -51,10 +66,9 @@ glimpse(dat)
   
   # Look at all unique primary references for each rate type
   dat %>% 
-    group_by(rate_name) %>% 
-    distinct(primRef, rate_name) %>% 
+    distinct(primRef) %>% 
     summarise(count = n())
-      # 23 records
+      # 27 records
 
   
 
@@ -94,11 +108,15 @@ taxaDat <- dat %>%
 # Join taxa info and harmonise weight data ----
 datClean <- dat %>% 
     left_join(taxaDat, by = "taxa") %>% 
-    rowwise() %>% 
-    mutate(BMC_mg = convert_CW(BM_C, weight_unit)) %>% # harmonise C weight data to mg
+    mutate(BM_dry_mg = sizeAssocValue, # simplify dry mass variable...
+           # Note, excretion rates are currently ug ammonia...
+           rate_value = rate_value / 1000, # convert them to mg like all other rates...
+           rate_unit = "mgN-NH4+/ind/hr", # update the unit to match updated rate values
+           ) %>% 
+    group_by(primRef, taxa, temp_C, BM_dry_mg) %>% # group the data by study, taxon, and associated temp and carbon mass
+    slice_max(rate_value, n = 1, with_ties = FALSE) %>% # slice the maximum rate value from that data
     ungroup() %>% 
     relocate(c(phylum, class, order, family, genus, species), .before = taxa) %>% 
-    relocate(BMC_mg, .after = BM_C) %>%
     mutate(
       # Create custom size groupings following Grigoratou et al. 2025 Figure 1
       sizeGrp = case_when(
@@ -108,14 +126,13 @@ datClean <- dat %>%
         class == "Copepoda"       ~ "Mesoplankton",
         order == "Pteropoda"      ~ "Mesoplankton", # grouped here because they are Pteropods
         # Macroplankton: 20 mm - 200 mm
-        phylum == "Annelida"      ~ "Macroplankton", # grouped here because Tomopteris carpenteri is a larger sp.
+        phylum == "Annelida"      ~ "Macroplankton", 
         phylum == "Cnidaria"      ~ "Macroplankton",
         phylum == "Ctenophora"    ~ "Macroplankton",
         class == "Hydrozoa"       ~ "Macroplankton",
         class == "Malacostraca"   ~ "Macroplankton",
         class == "Thaliacea"      ~ "Macroplankton",
         # Others - not classified and will be excluded from analyses
-        order == "Oegopsida"      ~ "OTHER", # an order of Cephalopod (squid), excluded because likely too large and rare as zoops
         .default = "OTHER"),
       
       # Create custom functional groups based on feeding modes
@@ -155,62 +172,51 @@ datClean <- dat %>%
     ) %>% 
     relocate(zoopGrp, .before = phylum) %>% 
     relocate(funcGrp, .before = zoopGrp) %>% 
-    relocate(sizeGrp, .before = funcGrp)
+    relocate(sizeGrp, .before = funcGrp) %>% 
+    drop_na(temp_C) %>% 
+    filter(funcGrp != "OTHER") # remove other groups...
 
 # End data cleaning ----
-
+glimpse(datClean)
      
     
 # Harmonise and prep data for analysis ----
 datFinal <- datClean %>%
-      
-  # Harmonise data with conversion function
-  rowwise() %>%
-  mutate(.conv = list(
-    if(rate_name == "RespirationRate") {
-      convert_respiration(rate_value, rate_unit, genus)
-      } 
-    else {
-      list(rate = NA_real_, unit = NA_character_)
-      }),
-    rate_value_clean = .conv$rate, 
-    rate_unit_clean  = .conv$unit) %>%
-  ungroup() %>%
-    
+
   # Estimate dry mass based on the % from Kiorboe's 2013 Table 1 
-  mutate(BM_dry_mg = case_when(zoopGrp == "Appendicularians" ~ BMC_mg / (10.3/100),
-                               zoopGrp == "Chaetognaths" ~ BMC_mg / (36.7/100),
-                               zoopGrp == "Cnidarians"   ~ BMC_mg / (13.2/100),
-                               zoopGrp == "Copepods"     ~ BMC_mg / (48/100),
-                               zoopGrp == "Ctenophores"  ~ BMC_mg / (5.1/100),
-                               zoopGrp == "Euphausiids"  ~ BMC_mg / (41.9/100),
-                               zoopGrp == "Thaliaceans"  ~ BMC_mg / (10.3/100))) %>% 
+  mutate(BMC_mg = case_when(zoopGrp == "Appendicularians" ~ BM_dry_mg * (10.3/100),
+                            zoopGrp == "Chaetognaths" ~ BM_dry_mg * (36.7/100),
+                            zoopGrp == "Cnidarians"   ~ BM_dry_mg * (13.2/100),
+                            zoopGrp == "Copepods"     ~ BM_dry_mg * (48/100),
+                            zoopGrp == "Ctenophores"  ~ BM_dry_mg * (5.1/100),
+                            zoopGrp == "Euphausiids"  ~ BM_dry_mg * (41.9/100),
+                            zoopGrp == "Thaliaceans"  ~ BM_dry_mg * (10.3/100),
+                            zoopGrp == "Amphipods"    ~ BM_dry_mg * (34.5/100),
+                            zoopGrp == "Molluscs"     ~ BM_dry_mg * (28.9/100),
+                            zoopGrp == "Mysids"       ~ BM_dry_mg * (43.5/100)
+                            )
+         ) %>% 
       
-  # Convert to mass-specific rates
+  # Convert to Cmass-specific rates
   mutate(Cspecific_rate = case_when(
-    rate_name == "RespirationRate" & rate_unit_clean == "ulO2/mgC/hr" ~ rate_value_clean, # keep as is, already mass-specific
-    rate_name == "RespirationRate" & rate_unit_clean == "ulO2/ind/hr" & !is.na(BMC_mg) ~ rate_value_clean / BMC_mg, # convert to mass-specific
+    rate_name == "excretionRateN" & rate_unit == "mgN-NH4+/ind/hr" & !is.na(BMC_mg) ~ rate_value / BMC_mg, # convert to mass-specific
     TRUE ~ NA_real_),
     Cspecific_unit = case_when(
-      rate_name == "RespirationRate" & !is.na(Cspecific_rate) ~ "ulO2/mgC/hr", # update mass-specific units to match the rates...
-      TRUE ~ rate_unit_clean),
+      rate_name == "excretionRateN" & !is.na(Cspecific_rate) ~ "mgN-NH4+/mgC/hr", # update mass-specific units to match the rates...
+      TRUE ~ rate_unit),
     zoopGrp = as.factor(zoopGrp)) %>%
     
   # Convert to dry-mass specific rates  
   mutate(DrySpecific_rate = case_when(
-    rate_name == "RespirationRate" & rate_unit_clean == "ulO2/ind/hr"  & !is.na(BM_dry_mg) ~ rate_value_clean / BM_dry_mg, # convert to dryspecific
-    rate_name == "RespirationRate" & rate_unit_clean == "ulO2/mgC/hr"  & !is.na(BM_dry_mg) & !is.na(BMC_mg) ~ (rate_value_clean * BMC_mg) / BM_dry_mg, # C to dry
+    rate_name == "excretionRateN" & rate_unit == "mgN-NH4+/ind/hr"  & !is.na(BM_dry_mg) ~ rate_value / BM_dry_mg, # convert to dryspecific
     TRUE ~ NA_real_),
     DrySpecific_unit = case_when(
-      rate_name == "RespirationRate" & !is.na(DrySpecific_rate) ~ "ulO2/mgDry/hr",
-      TRUE ~ rate_unit_clean)) %>%    
+      rate_name == "excretionRateN" & !is.na(DrySpecific_rate) ~ "ulO2/mgDry/hr",
+      TRUE ~ rate_unit)) %>%    
     
-  select(-c(.conv, BM_wet, BM_dry, BM_C, weight_unit, weight_calc)) %>% # tidy up the dataframe
+  select(-c(sizeAssocName, sizeAssocValue, sizeAssocUnit)) %>% # tidy up the dataframe
   relocate(Cspecific_rate, .after = rate_name) %>%
-  relocate(Cspecific_unit, .after = Cspecific_rate) %>% 
-  relocate(rate_value_clean, .after = Cspecific_unit) %>% 
-  relocate(rate_unit_clean, .after = rate_value_clean) %>% 
-  filter(Cspecific_rate < 60) # exclude rates that are not biologically reasonable
+  relocate(Cspecific_unit, .after = Cspecific_rate)
 glimpse(datFinal)
 
 # End harmonisation and conversion ----
@@ -220,15 +226,14 @@ glimpse(datFinal)
   datFinal %>% 
     ggplot() + 
     geom_point(aes(x = temp_C, 
-                   y = log(DrySpecific_rate), # mass-specific
+                   y = log(Cspecific_rate), # mass-specific
                    colour = sizeGrp))
   
   # sizeGrp
   datFinal %>% 
-    filter(rate_unit_clean == "ulO2/ind/hr") %>% 
     ggplot() + 
     geom_point(aes(x = temp_C, 
-                   y = log(rate_value_clean), # absolute
+                   y = log(DrySpecific_rate), # absolute
                    colour = sizeGrp))
   
   
@@ -239,14 +244,7 @@ glimpse(datFinal)
                    y = log(Cspecific_rate), # mass-specific
                    colour = funcGrp))
   
-  # funcGrp
-  datFinal %>% 
-    filter(rate_unit_clean == "ulO2/ind/hr") %>% 
-    ggplot() + 
-    geom_point(aes(x = temp_C, 
-                   y = log(rate_value_clean), # absolute
-                   colour = funcGrp))
-  
+ 
   
   # zoopGrp
   datFinal %>% 
@@ -255,14 +253,7 @@ glimpse(datFinal)
                    y = log(Cspecific_rate), # mass-specific
                    colour = zoopGrp))
   
-  # funcGrp
-  datFinal %>% 
-    filter(rate_unit_clean == "ulO2/ind/hr") %>% 
-    ggplot() + 
-    geom_point(aes(x = temp_C, 
-                   y = log(rate_value_clean), # absolute
-                   colour = zoopGrp))
-
+  
   
   # Count unique ZoopGrps rates
   datClean %>% 
@@ -270,12 +261,16 @@ glimpse(datFinal)
     mutate(countZGrp = sum(zoopGrp > 1, na.rm = TRUE)) %>% 
     distinct(zoopGrp, countZGrp) %>% 
     arrange(countZGrp)
-    # Amphipods          25
-    # Ctenophores        51
-    # Thaliaceans        84
-    # Euphausiids       222
-    # Cnidarians        240
-    # Copepods          370
+  # 1 Appendicularians        21
+  # 2 Ctenophores             32
+  # 3 Decapods                35
+  # 4 Mysids                  67
+  # 5 Amphipods               70
+  # 6 Cnidarians              81
+  # 7 Thaliaceans             98
+  # 8 Chaetognaths           132
+  # 9 Euphausiids            333
+  # 10 Copepods               914
   
   
   # Count unique functional groups rates
@@ -284,9 +279,9 @@ glimpse(datFinal)
     mutate(countFuncGrp = sum(funcGrp > 1, na.rm = TRUE)) %>% 
     distinct(funcGrp, countFuncGrp) %>% 
     arrange(countFuncGrp)
-    # GelFilter             84
-    # GelPreds             291
-    # Crustaceans          617
+  # 1 GelFilter            119
+  # 2 GelPreds             245
+  # 3 Crustaceans         1419
   
   
   # Count unique size groups rates
@@ -295,17 +290,17 @@ glimpse(datFinal)
     mutate(countSizeGrp = sum(sizeGrp > 1, na.rm = TRUE)) %>% 
     distinct(sizeGrp, countSizeGrp) %>% 
     arrange(countSizeGrp)
-    # Mesoplankton           370
-    # Macroplankton          622
+  # 1 Macroplankton          716
+  # 2 Mesoplankton          1067
   
   
   # Check the temperature range for each zoopGrp
   datClean %>% 
-    select(zoopGrp, temp_C, rate_name) %>% 
+    select(zoopGrp, temp_C) %>% 
     group_by(zoopGrp) %>% 
     summarise( 
       temp_range = paste0(min(temp_C), "-", max(temp_C)))
-  # All have sensible ranges for estimating Q10, except for amphipods
+  # All seem fine...
 
 # Save as RDS for later use
-# saveRDS(datFinal, "Data/resp_dat.rds")
+# saveRDS(datFinal, "Data/excrete_dat.rds")

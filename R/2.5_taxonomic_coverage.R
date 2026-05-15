@@ -52,7 +52,7 @@ temp_dat_summary <- function(data, dataset_name) {
 }
 
 
-# Bind all the data into a tibble
+# Bind all the data into a tibble and summarise temperature data
 tempDat_binded <- bind_rows(
   temp_dat_summary(respiration, "respiration"),
   temp_dat_summary(growth, "growth"),
@@ -69,7 +69,7 @@ tempDat_binded %>%
     prop_temp_range = n_temp_range / n_total * 100)
 # Data between 0 and 30 degC
 # n_total n_temp_range prop_temp_range
-#    2555         2424            94.9
+#    2327         2201            94.6
 
 
 
@@ -82,7 +82,7 @@ method_dat_summary <- function(data, dataset_name) {
 }
 
 
-# Bind all the data into a tibble
+# Bind all the data into a tibble and summarise methodology info
 methodDat_binded <- bind_rows(
   method_dat_summary(respiration, "respiration"),
   method_dat_summary(growth, "growth"),
@@ -115,17 +115,18 @@ methodDat_binded %>%
          ) %>% 
   group_by(method) %>%
   summarise(n = n(), .groups = "drop") %>%
-  mutate(prop_method = n / sum(n) * 100) %>% 
+  mutate(prop_method = round(n / sum(n) * 100, digit = 0)) %>% 
   arrange(-prop_method)
-# Table S1 - Proportion of methods used for original data collection
+# Table S2 - Proportion of methods used for original data collection
 # method                    n         prop_method
-# Not reported           1768       68.3 
-# Controlled experiment   766       29.5 
-# In situ experiment       56       2.2
+# Not reported           1581       66 
+# Controlled experiment   758       32 
+# In situ experiment       56        2
+
 
 # How many total observations?
-1768 + 766 + 56
-  # 2590
+1581 + 758 + 56
+  # 2395
 
 # What is the number of distinct records per rate?
 tempDat_binded %>% group_by(Dataset) %>% distinct(primRef) %>% count()
@@ -137,7 +138,7 @@ tempDat_binded %>% group_by(Dataset) %>% distinct(primRef) %>% count()
 
 # What is the number of distinct records?
 tempDat_binded %>% distinct(primRef) %>% nrow()
-# 138
+# 140
 
 
 # Table 1 ---
@@ -158,12 +159,12 @@ taxonomic_coverage
 # Dataset     n_phylas n_classes n_orders n_families n_genera n_species n_observations n_records
 # 1 Clearance          5         8       12         27       35        65            618        64
 # 2 Ingestion          3         5        7         16       21        44            307        43
-# 3 Growth             5         7       16         28       32        48            683        54
+# 3 Growth             5         7       15         27       30        44            488        54
 # 4 Respiration        4         7       15         39       55       103            982        19
 
 # Total nobs
-618 + 307 + 683 + 982 
-  # 2590.... perfect. matches previous count
+618 + 307 + 488 + 982 
+  # 2395, perfect. matches previous count
 
 # number of observations pre-cleaning were... 
 # Clearance   1580
