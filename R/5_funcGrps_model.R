@@ -58,6 +58,13 @@ respdat <- readRDS("Data/resp_dat.rds") %>%
   mutate(rate_name = factor("Respiration"))
 
 
+# Excretion data
+excredat <- readRDS("Data/excrete_dat.rds") %>% 
+  select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
+  drop_na(Cspecific_rate) %>% 
+  mutate(rate_name = factor("Excretion"))
+
+
 # Custom grouping order
 group_order <- c("Crustaceans", 
                  "GelPreds", 
@@ -65,7 +72,7 @@ group_order <- c("Crustaceans",
 
 
 # Combine them into one dataframe
-usedat <- rbind(cleardat, ingdat, grwdat, respdat) %>% 
+usedat <- rbind(cleardat, ingdat, grwdat, respdat, excredat) %>% 
   filter_out(funcGrp == "OTHER" | is.na(temp_C)) %>%  # filter out the functional group "OTHER" and remove any NAs in temp_C
   mutate(funcGrp = fct_relevel(funcGrp, group_order)) # reorder funcGrp
   
@@ -77,30 +84,8 @@ usedat %>%
   summarise( 
     temp_range = paste0(min(temp_C), "-", max(temp_C))) %>% 
   arrange(rate_name, funcGrp)
-
-
-# Quickly view distribution of raw Cspecific_rates
-# I will use these to remove extreme outliers, particularly those that don't make biological sense
-usedat %>%
-  ggplot() +
-  geom_point(aes(x = temp_C, y = Cspecific_rate)) +
-  theme_bw() +
-  facet_wrap(~ rate_name, scales = "free") + 
-  labs(
-    x = "Temp C",
-    y = "Clearance rate")
-
-
-usedat %>%
-  ggplot(aes(x = log(Cspecific_rate))) + # log because we will transform the data for analysis
-  geom_histogram(bins = 50, fill = "pink", colour = "grey") +
-  theme_bw() +
-  facet_wrap(~rate_name, scales = "free") +
-  labs(
-    x = "Mass-specific rate (Cspecific_rate, log scale)",
-    y = "Count",
-    title = "Distribution of Cspecific_rate across all zooplankton")
-    # distribution looks pretty normal but ingestion and clearance are slightly left skewed
+# GelFilter may have issues due to narrow temp range for clearance, ingestion, growth...
+# GelPreds may have issues with ingestion
 
 
 
@@ -117,14 +102,18 @@ mdat <- usedat %>%
 mdat %>% 
   ggplot() +
   geom_point(aes(x = temp_C, y = ln_Cspecific_rate, , colour = funcGrp)) +
-  facet_wrap(~ rate_name, scale = "free") +
-  theme_bw()
+  facet_wrap(~ rate_name, scale = "free") 
   # Looks pretty tidy. Some clear relationships here
-
+  # Note: 
+  # clearance is ml/mgC/hr
+  # ingestion is mgC/mgC/hr 
+  # growth is mgC/mgC/hr
+  # respiration is uLO2/mgC/hr
+  # excretion is mgN-NH4+/mgC/hr
 summary(mdat)
 
 
-# My main question here is...
+# My main questions here are...
   # How does temperature dependence vary across zooplankton func groups for each rate? AND
   # How does temperature dependence vary across rate processes?
 
@@ -139,49 +128,92 @@ m1 <- glmmTMB(ln_Cspecific_rate ~
                 temp_C * rate_name * funcGrp + # 3-way interaction
                 (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
               data = mdat) 
-
-  # Check diagnostics
-  sim <- simulateResiduals(m1)
-  plot(sim) # looks pretty good
+  # Model did not converge....as with the previous size-group analysis, we will simplify the random effects structure first
   summary(m1)
-  # Kind of difficult to interpret as before...
-
+  # primRef slope is closer to zero
   
-# A simpler model without the 3-way interactions, just 2-way interactions
+
+# Refit m1 as m2 without primRef as random slope
 m2 <- glmmTMB(ln_Cspecific_rate ~ 
-                temp_C * rate_name + # interactions between temp and different rates across all zooplankton
-                temp_C * funcGrp +  # between temp and different funcGrps for all rates
-                rate_name * funcGrp + # between rates and funcGrp 
-                (temp_C | primRef) + (1 | taxa), # with primRef and taxa as random intercepts and slopes (only slope for taxa, because model did not converge)
+                temp_C * rate_name * funcGrp + # three-way interaction
+                (1 | primRef) + (temp_C | taxa), # with primRef as random intercept and taxa as random intercept and slope
               data = mdat) 
+  # Great, model converged
 
   # Check diagnostics
   sim <- simulateResiduals(m2)
-  plot(sim) # Looks fine but seems less scattered compared to m1
+  plot(sim) # Looks fine, could be a couple of outliers based on the residuals plot...it is probably the appendicularians in the excretion dataset
   summary(m2)
 
   
+# Fit a simpler model without the 3-way interactions, just 2-way interactions and same random effect structure
+  # This model does not initially converge with random slope for primRef, so we remove it
+m3 <- glmmTMB(ln_Cspecific_rate ~ 
+                temp_C * rate_name + # interactions between temp and different rates across all zooplankton
+                temp_C * funcGrp +  # between temp and different funcGrps for all rates
+                rate_name * funcGrp + # between rates and funcGrp 
+                (1 | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes (only slope for taxa, because model did not converge)
+              data = mdat) 
+
+  # Check diagnostics
+  sim <- simulateResiduals(m3)
+  plot(sim) # Looks OK, virtually the same as m2
+  summary(m3)
+
+  
 # Compare models
-performance::compare_performance(m1, m2)
-# Models are not all mutually nested...we'll just treat AIC/BIC as descriptive...
+performance::compare_performance(m2, m3)
+# Models are not all mutually nested...we'll just treat AIC as descriptive...
+  # 3-way interaction is still best so far (m2)
 
 
 # Likelihood ratios test of the models
-# Refit with ML for valid test on fixed/dispersion and random effect structures
-m1_m1 <- update(m1, REML = FALSE)
+# Refit with ML to test fixed effects and random effect structures
 m2_m2 <- update(m2, REML = FALSE)
+m3_m3 <- update(m3, REML = FALSE)
 
-anova(m1_m1, m2_m2) # test if the three-way interaction is better than the two-way interaction
-  # m1 with 3-way interaction is slightly better
+anova(m2_m2, m3_m3) # test if the three-way interaction is better than the two-way interaction without random slope for primRef
+  # Yep, m2 with 3-way interaction is better
 
 # we will progress with m1
-summary(m1)
+summary(m2)
 
 
 # Extract slopes using and calculate Q10 for each funcGrp ----
-funcGrp_slopes <- emtrends(m1, ~ rate_name * funcGrp, var = "temp_C")
+funcGrp_slopes <- emtrends(m2, ~ rate_name * funcGrp, var = "temp_C")
 summary(funcGrp_slopes, infer = TRUE) # test whether each slope is different from zero for each zoopGrp
+# No significant temp relationships for: (may due to limited data across the temp range?)
+  # GelPreds, clearance
+  # GelPreds, ingestion
+  # GelPreds, growth
+  # GelFilter, clearance
+  # GelFilter, ingestion
+  # GelFilter, growth
+  # GelFilter, respiration
 emmeans::contrast(funcGrp_slopes, by = "rate_name", method = "pairwise", adjustment = "mvt") # pairwise test whether slopes differ significantly across rate types and grps
+# Only sig differences for:
+  # crustaceans - gelPreds, clearance
+  # crustaceans - gelPreds, growth
+  # crustaceans - gelPreds, excretion
+  # gelPreds - gelFilters, excretion
+
+
+
+# Extract intercepts ----
+funcGrp_intercepts <- data.frame(emmeans(m2, ~ rate_name * funcGrp, var = "temp_C"))
+
+
+# Build a parameter dataframe and to estimate ratios
+params <- data.frame(funcGrp_slopes) %>% 
+  rename(slope = temp_C.trend) %>% 
+  select(-c(SE, df, asymp.LCL, asymp.UCL)) %>% 
+  left_join(funcGrp_intercepts) %>% 
+  rename(intercept = emmean) %>% 
+  select(-c(SE, df, asymp.LCL, asymp.UCL))
+
+
+# Save the parameter data for later, we'll use this to estimate ratios of the terms
+# saveRDS(params, file = "Data/modelParameters/funcGrpestimates.rds")
 
 
 # Get n
@@ -258,7 +290,8 @@ PlotLMM = function(model){
                  "Clearance"   = "bold(Clearance~rate~(ml~mgC^-1~h^-1))",
                  "Ingestion"   = "bold(Ingestion~rate~(mgC~mgC^-1~h^-1))",
                  "Growth"      = "bold(Growth~rate~(mgC~mgC^-1~h^-1))",
-                 "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))"
+                 "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))",
+                 "Excretion"   = "bold(Excretion~rate~('mgN-NH'[4]^'+'~mgC^-1~h^-1))"
                ), 
                label_parsed))+ 
     coord_cartesian(xlim = c(-2, 32)) +
@@ -280,7 +313,7 @@ PlotLMM = function(model){
 
 
 # Plot it
-tempPlot <- PlotLMM(m1)
+tempPlot <- PlotLMM(m2)
 tempPlot
 
 
@@ -306,7 +339,8 @@ funcGQ10plot <- ggplot() +
                "Clearance"   = "bold(Clearance~rate~(ml~mgC^-1~h^-1))",
                "Ingestion"   = "bold(Ingestion~rate~(mgC~mgC^-1~h^-1))",
                "Growth"      = "bold(Growth~rate~(mgC~mgC^-1~h^-1))",
-               "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))"
+               "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))",
+               "Excretion"   = "bold(Excretion~rate~('mgN-NH'[4]^'+'~mgC^-1~h^-1))"
              ), 
              label_parsed)) +
   scale_colour_manual(values = grp_cols) +
@@ -320,6 +354,7 @@ funcGQ10plot <- ggplot() +
     legend.position = "none"
   )
 funcGQ10plot
+# confidence intervals are not good to visualise, we will break the y-axes to better compared estimates
 
 library(ggbreak) # to break y-axis on massive Q10 variance
 funcG10plot_break <- funcGQ10plot +
@@ -337,6 +372,6 @@ funcG10plot_break
 tempPlot/funcG10plot_break
 
 # Save it
-ggsave("Output/Figure4/Figure4_tempPlot.pdf", tempPlot, width = 160, height = 150, units = "mm", dpi = 300)
-ggsave("Output/Figure4/Figure4_Q10Plot.pdf", funcG10plot_break, width = 160, height = 120, units = "mm", dpi = 300)
+# ggsave("Output/Figure4/Figure4_tempPlot.pdf", tempPlot, width = 160, height = 150, units = "mm", dpi = 300)
+# ggsave("Output/Figure4/Figure4_Q10Plot.pdf", funcG10plot_break, width = 160, height = 120, units = "mm", dpi = 300)
 

@@ -82,7 +82,7 @@ usedat %>%
   summarise( 
     temp_range = paste0(min(temp_C), "-", max(temp_C))) %>% 
   arrange(rate_name, sizeGrp)
-  # looks good
+  # looks good for all groups
 
 
 
@@ -99,14 +99,18 @@ mdat <- usedat %>%
 mdat %>% 
   ggplot() +
   geom_point(aes(x = temp_C, y = ln_Cspecific_rate, , colour = sizeGrp)) +
-  facet_wrap(~ rate_name, scale = "free") +
-  theme_bw()
+  facet_wrap(~ rate_name, scale = "free")
   # Looks pretty tidy. Some clear relationships here
-
+  # Note: 
+  # clearance is ml/mgC/hr
+  # ingestion is mgC/mgC/hr 
+  # growth is mgC/mgC/hr
+  # respiration is uLO2/mgC/hr
+  # excretion is mgN-NH4+/mgC/hr
 summary(mdat)
 
 
-# My main question here is...
+# My main questions here are...
   # How does temperature dependence vary across zooplankton groups for each rate? AND
   # How does temperature dependence vary across rate processes among groups?
 
@@ -119,18 +123,30 @@ summary(mdat)
 # A complex model with 3 way interactions for temp, sizeGrp and rate with random effects
 m1 <- glmmTMB(ln_Cspecific_rate ~ 
                 temp_C * rate_name * sizeGrp + # three-way interaction
-                (1 | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
+                (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
               data = mdat) 
+  # model doesn't converge...will check the random effects variance
 
   # Check diagnostics
-  sim <- simulateResiduals(m1)
-  plot(sim) # looks pretty good
   summary(m1)
-  # Kind of difficult to interpret I'll use emtrends to extract rate-specific slopes later
+  # primRef random slope is close to zero so I will drop that and re-fit
   
   
-# A simpler model without the 3-way interactions, just 2-way interactions, same random effect structure
+# Refit m1 as m2 without primRef as random slope
 m2 <- glmmTMB(ln_Cspecific_rate ~ 
+                temp_C * rate_name * sizeGrp + # three-way interaction
+                (1 | primRef) + (temp_C | taxa), # with primRef as random intercept and taxa as random intercept and slope
+              data = mdat) 
+  # Great, model converged
+
+  # Check diagnostics
+  sim <- simulateResiduals(m2)
+  plot(sim) # Looks fine, could be a couple of outliers based on the residuals plot...it is probably the appendicularians in the excretion dataset
+  summary(m2)
+
+  
+# Fit a simpler model without the 3-way interactions, just 2-way interactions, same random effect structure
+m3 <- glmmTMB(ln_Cspecific_rate ~ 
                 temp_C * rate_name + # interactions between temp and different rates across all zooplankton
                 temp_C * sizeGrp +  # between temp and different sizeGrps for all rates
                 rate_name * sizeGrp + # between rates and sizeGrp 
@@ -138,41 +154,42 @@ m2 <- glmmTMB(ln_Cspecific_rate ~
               data = mdat) 
 
   # Check diagnostics
-  sim <- simulateResiduals(m2)
-  plot(sim) # Looks fine but seems less scattered compared to m1
-  summary(m2)
+  sim <- simulateResiduals(m3)
+  plot(sim) # Looks fine but seems less scattered compared to m1, QQ plot looks slightly better though
+  summary(m3)
   
 
-# Compare models
-performance::compare_performance(m1, m2)
-# Models are not all mutually nested...we'll just treat AIC/BIC as descriptive...
+# Compare models with different fixed effects
+performance::compare_performance(m2, m3)
+# Models are not all mutually nested...we'll just treat AIC as descriptive...
+  # 3-way interaction appears better so far (m2)
 
 
 # Likelihood ratios test of the models
-# Refit with ML for valid test on fixed/dispersion and random effect structures
-m1_m1 <- update(m1, REML = FALSE)
+# Refit with ML to test the different fixed effect structures
 m2_m2 <- update(m2, REML = FALSE)
-
-anova(m1_m1, m2_m2) # test if the three-way interaction is better than the two-way interaction
-  # m1 with 3-way interaction is better
+m3_m3 <- update(m3, REML = FALSE)
 
 
-# I will use m1 on the basis of the chisqr test and AIC...
-summary(m1)
+anova(m2_m2, m3_m3) # test if the three-way interaction is better than the two-way interaction
+  # m2 with 3-way interaction is better
+
+# I will use m2 on the basis of the chisqr test and AIC...
+summary(m2)
 
 
 
 # Extract slopes using and calculate Q10 for each sizeGrp ----
-sizeGrp_slopes <- emtrends(m1, ~ rate_name * sizeGrp, var = "temp_C")
+sizeGrp_slopes <- emtrends(m2, ~ rate_name * sizeGrp, var = "temp_C")
 summary(sizeGrp_slopes, infer = TRUE) # test whether each slope is different from zero for each sizeGrp
 # yes, all different to zero
 emmeans::contrast(sizeGrp_slopes, by = "rate_name", method = "pairwise", adjustment = "none") # pairwise test whether slopes differ significantly across rate types and grps
   # yes, clearance: meso-macro
 
 
-# Extract intercepts ----
-sizeGrp_intercepts <- data.frame(emmeans(m1, ~ rate_name * sizeGrp, var = "temp_C"))
 
+# Extract intercepts ----
+sizeGrp_intercepts <- data.frame(emmeans(m2, ~ rate_name * sizeGrp, var = "temp_C"))
 
 
 # Build a parameter dataframe and to estimate ratios
@@ -185,7 +202,7 @@ params <- data.frame(sizeGrp_slopes) %>%
 
 
 # Save the parameter data for later, we'll use this to estimate ratios of the terms
-#saveRDS(params, file = "Data/modelParameters/sizeGrpestimates.rds")
+# saveRDS(params, file = "Data/modelParameters/sizeGrpestimates.rds")
 
 
 # Get n
@@ -283,9 +300,8 @@ PlotLMM = function(model){
 }
 
 
-
 # Plot it
-tempPlot <- PlotLMM(m1)
+tempPlot <- PlotLMM(m2)
 tempPlot
 
 

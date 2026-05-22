@@ -22,7 +22,7 @@ source("R/0_Helpers.R")
 
 
 # Read in the data ----
-dat <- read_csv("https://www.dropbox.com/scl/fi/itv9vpnu8twxz2fyhmp1u/Resp_dat.csv?rlkey=9fig4vcw2cog4rc4qa6mtj7lj&st=mhqgpuqj&dl=1", 
+dat <- read_csv("https://www.dropbox.com/scl/fi/itv9vpnu8twxz2fyhmp1u/Resp_dat.csv?rlkey=9fig4vcw2cog4rc4qa6mtj7lj&st=zkw9mqxu&dl=1", 
                 skip = 1) %>%
   mutate(ref_no = if_else(is.na(ref_no) | ref_no == "", # if the value is NA or empty...
                           paste0("Hill_", row_number()), # apply a unique reference number
@@ -31,14 +31,13 @@ dat <- read_csv("https://www.dropbox.com/scl/fi/itv9vpnu8twxz2fyhmp1u/Resp_dat.c
   relocate(ref_no, .before = everything()) %>% # move it before all columns
   filter_out(data_type == "Mean") # exclude any mean data
 
-
 glimpse(dat)
 
   
   # Count number of initial pre-cleaned records
   dat %>% group_by(rate_name) %>% 
     summarise(count = n())
-  # RespirationRate  992
+  # RespirationRate  981
 
 
   # Look at all unique taxon
@@ -54,7 +53,7 @@ glimpse(dat)
     group_by(rate_name) %>% 
     distinct(primRef, rate_name) %>% 
     summarise(count = n())
-      # 23 records
+      # 20 records
 
   
 
@@ -91,7 +90,7 @@ taxaDat <- dat %>%
 
   
 
-# Join taxa info and harmonise weight data ----
+ # Join taxa info and harmonise weight data ----
 datClean <- dat %>% 
     left_join(taxaDat, by = "taxa") %>% 
     rowwise() %>% 
@@ -209,60 +208,34 @@ datFinal <- datClean %>%
   relocate(Cspecific_rate, .after = rate_name) %>%
   relocate(Cspecific_unit, .after = Cspecific_rate) %>% 
   relocate(rate_value_clean, .after = Cspecific_unit) %>% 
-  relocate(rate_unit_clean, .after = rate_value_clean) %>% 
-  filter(Cspecific_rate < 60) # exclude rates that are not biologically reasonable
+  relocate(rate_unit_clean, .after = rate_value_clean)
 glimpse(datFinal)
 
 # End harmonisation and conversion ----
 
-# Final checks
-  # sizeGrp
-  datFinal %>% 
-    ggplot() + 
-    geom_point(aes(x = temp_C, 
-                   y = log(DrySpecific_rate), # mass-specific
-                   colour = sizeGrp))
-  
-  # sizeGrp
-  datFinal %>% 
-    filter(rate_unit_clean == "ulO2/ind/hr") %>% 
-    ggplot() + 
-    geom_point(aes(x = temp_C, 
-                   y = log(rate_value_clean), # absolute
-                   colour = sizeGrp))
-  
-  
-  # funcGrp
-  datFinal %>% 
-    ggplot() + 
-    geom_point(aes(x = temp_C, 
-                   y = log(Cspecific_rate), # mass-specific
-                   colour = funcGrp))
-  
-  # funcGrp
-  datFinal %>% 
-    filter(rate_unit_clean == "ulO2/ind/hr") %>% 
-    ggplot() + 
-    geom_point(aes(x = temp_C, 
-                   y = log(rate_value_clean), # absolute
-                   colour = funcGrp))
-  
-  
-  # zoopGrp
-  datFinal %>% 
-    ggplot() + 
-    geom_point(aes(x = temp_C, 
-                   y = log(Cspecific_rate), # mass-specific
-                   colour = zoopGrp))
-  
-  # funcGrp
-  datFinal %>% 
-    filter(rate_unit_clean == "ulO2/ind/hr") %>% 
-    ggplot() + 
-    geom_point(aes(x = temp_C, 
-                   y = log(rate_value_clean), # absolute
-                   colour = zoopGrp))
 
+# Final checks
+  # Check corrected bodymass (at 15DegC) against mass-specific rates
+  datFinal %>% filter(rate_unit_clean == "ulO2/ind/hr") %>% 
+    ggplot() + 
+    geom_point(aes(x = log10(BMC_mg * 2.35^((15-temp_C)/10)), 
+                   y = log10(rate_value_clean), # mass-specific
+                   colour = zoopGrp),size = 1.5)
+  
+  # Check corrected bodymass (at 15DegC) against mass-specific rates
+  datFinal %>% #filter(rate_unit_clean == "ulO2/ind/hr") %>% 
+    ggplot() + 
+    geom_point(aes(x = log10(BMC_mg * 2.35^((15-temp_C)/10)), 
+                   y = log10(Cspecific_rate), # mass-specific
+                   colour = zoopGrp),size = 1)
+  
+  
+  # temp
+  datFinal %>% 
+    ggplot() + 
+    geom_point(aes(x = temp_C, 
+                   y = log(Cspecific_rate), # mass-specific
+                   colour = zoopGrp))
   
   # Count unique ZoopGrps rates
   datClean %>% 
@@ -272,10 +245,10 @@ glimpse(datFinal)
     arrange(countZGrp)
     # Amphipods          25
     # Ctenophores        51
-    # Thaliaceans        84
-    # Euphausiids       222
+    # Thaliaceans        79
+    # Euphausiids       231
     # Cnidarians        240
-    # Copepods          370
+    # Copepods          355
   
   
   # Count unique functional groups rates
@@ -284,9 +257,9 @@ glimpse(datFinal)
     mutate(countFuncGrp = sum(funcGrp > 1, na.rm = TRUE)) %>% 
     distinct(funcGrp, countFuncGrp) %>% 
     arrange(countFuncGrp)
-    # GelFilter             84
+    # GelFilter             79
     # GelPreds             291
-    # Crustaceans          617
+    # Crustaceans          611
   
   
   # Count unique size groups rates
@@ -295,8 +268,8 @@ glimpse(datFinal)
     mutate(countSizeGrp = sum(sizeGrp > 1, na.rm = TRUE)) %>% 
     distinct(sizeGrp, countSizeGrp) %>% 
     arrange(countSizeGrp)
-    # Mesoplankton           370
-    # Macroplankton          622
+    # Mesoplankton           355
+    # Macroplankton          626
   
   
   # Check the temperature range for each zoopGrp

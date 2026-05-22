@@ -1,4 +1,4 @@
-# Calculating overall rate Q10s
+# Calculating Z in general Q10s using dry-mass-specific rates
 # Josh Hill
 # 03/05/2026
 
@@ -59,8 +59,15 @@ respdat <- readRDS("Data/resp_dat.rds") %>%
   mutate(rate_name = factor("Respiration"))
 
 
+# Excretion data
+excredat <- readRDS("Data/excrete_dat.rds") %>% 
+  select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, DrySpecific_rate, temp_C, BMC_mg) %>% 
+  drop_na(Cspecific_rate) %>% 
+  mutate(rate_name = factor("Excretion"))
+
+
 # Combine them into one...
-usedat <- rbind(cleardat, ingdat, grwdat, respdat)
+usedat <- rbind(cleardat, ingdat, grwdat, respdat, excredat)
 
 
 # Check the temperature range
@@ -68,7 +75,7 @@ usedat %>%
   select(temp_C) %>% 
   summarise( 
     temp_range = paste0(min(temp_C), "-", max(temp_C)))
-    # -1.8-31 degC
+    # -1.9-31.4 degC
 
 
 # Quickly view the distribution of raw DM specific rates...
@@ -80,8 +87,8 @@ usedat %>%
   facet_wrap(~ rate_name, scales = "free") + 
   labs(
     x = "Temp C",
-    y = "Clearance rate")
-  # all seems reasonable and the data looks standard
+    y = "Dry-mass-specific rate")
+  # all seems reasonable and the data looks standard but notably smaller y-axes values compared to C-specific rates
 
 # Check distribution of data
 usedat %>%
@@ -104,16 +111,33 @@ mdat <- usedat %>%
 
 # Quick look
 mdat %>% 
-  ggplot() +
-  geom_point(aes(x = temp_C, y = ln_DMspecific_rate, colour = zoopGrp)) +
+  ggplot(aes(x = temp_C, y = ln_DMspecific_rate, colour = funcGrp)) +
+  geom_point(alpha = 0.5) +
   facet_wrap(~ rate_name, scale = "free") +
-  theme_bw()
-  # Looks pretty tidy. Some clear relationships here
+  geom_smooth(aes(group = rate_name), method = "lm") +
+  labs(title="Dry-mass-specific rates")
+# Looks pretty tidy. Some clear relationships here still, but ingestion has flattened off.
+  # Note: 
+  # clearance is ml/mgC/hr
+  # ingestion is mgC/mgC/hr 
+  # growth is mgC/mgC/hr
+  # respiration is uLO2/mgC/hr
+  # excretion is mgN-NH4+/mgC/hr
 
-summary(mdat)
+# Compare with C-specific rates for visualisation
+C_spec_mdat <- usedat %>% 
+  mutate(ln_Cspecific_rate = log(Cspecific_rate)) # log transform mass-specific rate and save as new variable
+C_spec_mdat %>% 
+  ggplot(aes(x = temp_C, y = ln_Cspecific_rate, colour = funcGrp)) +
+  geom_point(alpha = 0.5) +
+  facet_wrap(~ rate_name, scale = "free") +
+  geom_smooth(aes(group = rate_name), method = "lm") +
+  labs(title = "Carbon-mass-specific rates")
+# Correcting rates by dry mass shifts gelatinous Z's to be slightly lower than crustaceans...this is causing ingestion to flatten out because some of our warmer data are heavily biased towards gelatinous Z's...
+# This should confirm that carbon mass is the most efficient mass to standardise the data by.
 
 
-# My main question here is...
+# We will fit the models anyway to validate the C-specific results
   # How does temperature dependence vary across each rate for all zooplankton?
 
 
@@ -125,60 +149,70 @@ m1 <- glmmTMB(ln_DMspecific_rate ~
                 temp_C * rate_name + # interactions between temp and different rates across all zooplankton
                 (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
               data = mdat) 
+  # model does not converge...will look at reducing random effects structure complexity
 
-  # Check diagnostics
-  sim <- simulateResiduals(m1)
-  plot(sim) # looks ok
-  summary(m1)
-  # Kind of difficult to interpret I'll use emtrends to extract rate-specific slopes later
-
+  # Check diagnosis...
+  diagnose(m1)
+  summary(m1) # look at random effects parameters...
+  # primRef slope variance is closer to zero...we will remove that slope
+  
   
 # A simpler model with only random intercepts
 m2 <- glmmTMB(ln_DMspecific_rate ~ 
                 temp_C * rate_name + # interactions between temp and different rates across all zooplankton
-                (1 | primRef) + (1 | taxa), # with primRef and taxa as random intercepts only
+                (1 | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts only
               data = mdat)
 
   # Check diagnostics
   sim <- simulateResiduals(m2)
-  plot(sim) # Looks ok but seems less scattered compared to m1 and slightly more deviation in QQplot
+  plot(sim) # Looks ok but the tail on the QQ is pretty bad...  
   summary(m2)
 
+# We ensure the random slope for primRef is the correct one to remove...
+# A model with no random slope for taxa
+m3 <- glmmTMB(ln_DMspecific_rate ~ 
+                temp_C * rate_name + # interactions between temp and different rates across all zooplankton
+                (temp_C | primRef) + (1 | taxa), # with primRef and taxa as random intercepts only
+              data = mdat)
 
+  # Check diagnostics
+  sim <- simulateResiduals(m3)
+  plot(sim) # Looks ok but the tail on the QQ is pretty bad...  
+  summary(m3)
 
 # Compare models
-performance::compare_performance(m1, m2)
+performance::compare_performance(m2, m3)
 # Models are not all mutually nested...we'll just treat AIC/BIC as descriptive...
-# Seems like m1 is the best fit so far
+# Seems like m2 is the best fit so far
 
 
 # Likelihood ratios test of the models
 # Refit with ML for valid test on fixed/dispersion and random effect structures
-m1_m1 <- update(m1, REML = FALSE)
 m2_m2 <- update(m2, REML = FALSE)
+m3_m3 <- update(m3, REML = FALSE)
 
-anova(m1_m1, m2_m2) # test which random effects structure is a better fit
-  # m1 is better
+anova(m2_m2, m3_m3) # test which random effects structure is a better fit
+  # m2 is 100% better
 
 # We will proceed with m1 on the basis of AIC, BIC and likelihood ratio tests
-summary(m1)
-r.squaredGLMM(m1)
+summary(m2)
+r.squaredGLMM(m2)
 # R2m       R2c
-# 0.8437258 0.9630264
+# 0.8964949 0.9817019
 
 # Extract slopes and calculate Q10 for all zooplankton ----
-slopes <- emmeans::emtrends(m1, ~ rate_name, var = "temp_C")
+slopes <- emmeans::emtrends(m2, ~ rate_name, var = "temp_C")
 summary(slopes, infer = TRUE) # test whether each slope is different from zero for each zoopGrp
-  # all except ingestion
+  # all are significantly different to zero
 emmeans::contrast(slopes, method = "pairwise", adjust = "mvt") # pairwise test whether slopes differ significantly across rate types
-  # slight difference between clearance-ingestion
   # clearance - ingest
   # ingest - growth
   # ingest - respiration
+  # ingest - excretion
   
 
 # Extract intercepts ----
-intercepts <- data.frame(emmeans(m1, ~ rate_name, var = "temp_C"))
+intercepts <- data.frame(emmeans(m2, ~ rate_name, var = "temp_C"))
 
 
 # Build a parameter dataframe and to estimate ratios
@@ -260,7 +294,8 @@ PlotLMM = function(model){
                  "Clearance"   = "bold(Clearance~rate~(ml~mgDM^-1~h^-1))",
                  "Ingestion"   = "bold(Ingestion~rate~(mgC~mgDM^-1~h^-1))",
                  "Growth"      = "bold(Growth~rate~(mgDM~mgDM^-1~h^-1))",
-                 "Respiration" = "bold(Respiration~rate~(µlO[2]~mgDM^-1~h^-1))"
+                 "Respiration" = "bold(Respiration~rate~(µlO[2]~mgDM^-1~h^-1))",
+                 "Excretion"   = "bold(Excretion~rate~('mgN-NH'[4]^'+'~mgC^-1~h^-1))"
                ), 
                label_parsed))+ 
     coord_cartesian(xlim = c(-2, 32)) +
@@ -278,19 +313,11 @@ PlotLMM = function(model){
 
 
 # Plot it
-tempPlot <- PlotLMM(m1)
+tempPlot <- PlotLMM(m2)
 tempPlot
 
 
 # Generate Q10s for zooplankton in general ----
-
-
-# Define color palette
-rate_cols <- c("Clearance"   = "#66c2a5",
-               "Ingestion"   = "#fc8d62",
-               "Growth"      = "#8da0cb",
-               "Respiration" = "#e78ac3")
-
 
 # Plot allZoop Q10s
 allZoopQ10plot <- ggplot() +
@@ -309,7 +336,6 @@ allZoopQ10plot <- ggplot() +
             aes(x = rate_name, y = Q10_lwr, label = paste0("n = ", n)),
             nudge_y = -0.3,   
             size = 3.5, colour = "grey40") +
-  scale_fill_manual(values = rate_cols, guide = "none") +
   labs(x = "Biological rate process",
        y = bquote(bold("Dry-mass specific Q"[10]))) +
   theme(

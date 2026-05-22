@@ -102,6 +102,7 @@ convert_respiration <- function(rate, unit, genus) {
   
   if (unit == "ulO2/ind/hr") return(list(rate = rate,                  unit = "ulO2/ind/hr")) # maintain ulO2/ind/hr
   if (unit == "ulO2/ind/day") return(list(rate = rate / 24,            unit = "ulO2/ind/hr")) # day to hr
+  if (unit == "mlO2/ind/day") return(list(rate = rate * 1000 / 24,     unit = "ulO2/ind/hr")) # day to hr ml to ul
   if (unit == "ulO2/mgC/hr") return(list(rate = rate,                  unit = "ulO2/mgC/hr")) # maintain ulO2/mgC/hr
   if (unit == "ulO2/ugC/day") return(list(rate = (rate / 1000) / 24,   unit = "ulO2/mgC/hr")) # ugC to mgC
   if (unit == "umol/ind/hr") return(list(rate = rate * 22.4,           unit = "ulO2/ind/hr")) # umol to ulO2, as per the ideal gas law (i.e., 1 mol of gas = 22.4 L)
@@ -109,7 +110,7 @@ convert_respiration <- function(rate, unit, genus) {
   
   # Stoichiometry
   if (genus == "Euphausia" & unit == "ugC/ind/day") 
-    return(list(rate = ((rate / 24) / (12.011 * 0.9)) * 22.4,         unit = "ulO2/ind/hr")) # ugC to ulO2, where 0.9 = RQ (Ross1982), day to hr, 22.4 = uL/umol as molar volume of oxygen and 12.011 is ug/umol of molar mass carbon
+    return(list(rate = ((rate  / 24) / (12.011 * 0.9)) * 22.4,         unit = "ulO2/ind/hr")) # ugC to ulO2, where 0.9 = RQ (Ross1982), day to hr, 22.4 = uL/umol as molar volume of oxygen and 12.011 is ug/umol of molar mass carbon
   
   return(list(rate = NA_real_, unit = NA_character_))
 }

@@ -1,4 +1,4 @@
-# Calculating overall rate Q10s
+# Calculating Z in general Q10s using carbon-mass specific rates
 # Josh Hill
 # 03/05/2026
 
@@ -83,7 +83,6 @@ usedat %>%
 usedat %>%
   ggplot() +
   geom_point(aes(x = temp_C, y = Cspecific_rate)) +
-  theme_bw() +
   facet_wrap(~ rate_name, scales = "free") + 
   labs(
     x = "Temp C",
@@ -94,7 +93,6 @@ usedat %>%
 usedat %>%
   ggplot(aes(x = log(Cspecific_rate))) + # log because we will transform the data for analysis
   geom_histogram(bins = 50, fill = "pink", colour = "grey") +
-  theme_bw() +
   facet_wrap(~rate_name, scales = "free") +
   labs(
     x = "Mass-specific rate (Cspecific rates, log scale)",
@@ -111,17 +109,22 @@ mdat <- usedat %>%
 
 # Quick look
 mdat %>% 
-  ggplot() +
-  geom_point(aes(x = temp_C, y = ln_Cspecific_rate)) +
-  facet_wrap(~ rate_name, scale = "free") +
-  theme_bw()
+  ggplot(aes(x = temp_C, y = ln_Cspecific_rate, colour = rate_name)) +
+  geom_point() +
+  facet_wrap(~ rate_name, scale = "free") 
   # Looks pretty tidy. Some clear relationships here
+  # Note: 
+  # clearance is ml/mgC/hr
+  # ingestion is mgC/mgC/hr 
+  # growth is mgC/mgC/hr
+  # respiration is uLO2/mgC/hr
+  # excretion is mgN-NH4+/mgC/hr
 
 summary(mdat)
 
 
-# My main question here is...
-  # How does temperature dependence vary across each rate for all zooplankton?
+ # My main question here is...
+  # How does temperature dependence vary across each rate for zooplankton in general?
 
 
 
@@ -132,11 +135,12 @@ m1 <- glmmTMB(ln_Cspecific_rate ~
                 temp_C * rate_name + # interactions between temp and different rates across all zooplankton
                 (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
               data = mdat) 
+  # model doesn't converge...probably due to random effects because before including excretion, it converged fine...
 
   # Check diagnostics
   diagnose(m1) # I suspect the model does not converge well due to the random effects structure
-  summary(m1) # Check random effects
-  # I'll drop the random slope for primary reference because the variance is almost 0
+  summary(m1) # Check random effects variance...
+  # I'll drop the random slope for primary reference because the variance is closer to 0 compared to taxa random slope
 
   
 # A simpler model with only random intercept for primary reference but intercept and slope for taxa
@@ -148,9 +152,10 @@ m2 <- glmmTMB(ln_Cspecific_rate ~
 
   # Check diagnostics
   sim <- simulateResiduals(m2)
-  plot(sim) # Looks fine, bit of deviation on the tail
+  plot(sim) # Looks fine, bit of deviation on the QQ plot since including excretion
   summary(m2)
-  # we will swap the random intercepts over and check the model
+  # this looks good...
+  # but we will swap the random intercepts over and check the models anyway
   
   
 # A simpler model with only random intercepts but swapping single intercept structure to taxa...
@@ -167,11 +172,11 @@ m3 <- glmmTMB(ln_Cspecific_rate ~
   
 # Compare models 2 and 3...m1 did not converge
 performance::compare_performance(m2, m3)
-# Models are not all mutually nested...we'll just treat AIC/BIC as descriptive...
+# Models are not all mutually nested...we'll just treat AIC as descriptive...
 # Seems like m2 is the best fit so far...we'll refit with ML and check AIC
 
 # Likelihood ratios test of the models
-# Refit with ML for valid test on fixed/dispersion and random effect structures
+# Refit with ML for valid test on random effect structures
 m2_m2 <- update(m2, REML = FALSE)
 m3_m3 <- update(m3, REML = FALSE)
 
@@ -192,10 +197,10 @@ emmeans::contrast(slopes, method = "pairwise", adjust = "mvt") # pairwise test w
   # clearance - ingest
   # clearance - growth
   # clearance - respiration
-# Makes sense... clearance is technically not an energy budget term compared to the others
+# Makes sense I guess... clearance is technically not an energy budget term compared to the others
 
 # Extract intercepts ----
-intercepts <- data.frame(emmeans(m2, ~ rate_name, var = "temp_C"))
+intercepts <- data.frame(emmeans(m2, ~ rate_name, at = list(temp_C = 0)))
 
 
 # Build a parameter dataframe to estimate ratios
@@ -208,7 +213,7 @@ params <- data.frame(slopes) %>%
   
 
 # Save the parameter data for later, we'll use this to estimate ratios of the terms
-# saveRDS(params, file = "Data/modelParameters/allZestimates.rds")
+saveRDS(params, file = "Data/modelParameters/allZestimates.rds")
 
 
 # Get n_obs
@@ -294,9 +299,8 @@ PlotLMM = function(model){
 }
 
 
-
 # Plot it
-tempPlot <- PlotLMM(m1)
+tempPlot <- PlotLMM(m2)
 tempPlot
 
 
