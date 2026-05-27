@@ -94,6 +94,8 @@ mdat <- usedat %>%
   ungroup() %>% 
   mutate(ln_Cspecific_rate = log(Cspecific_rate)) # log transform mass-specific rate
 
+# Save mdat so we can estimate number of taxa for ratios later...
+# saveRDS(mdat, file = "Data/modelParameters/sizeGrp_mdat.rds")
 
 # Quick look
 mdat %>% 
@@ -181,7 +183,7 @@ summary(m2)
 
 # Extract slopes using and calculate Q10 for each sizeGrp ----
 sizeGrp_slopes <- emtrends(m2, ~ rate_name * sizeGrp, var = "temp_C")
-summary(sizeGrp_slopes, infer = TRUE) # test whether each slope is different from zero for each sizeGrp
+summary(sizeGrp_slopes, infer = TRUE) %>% arrange(sizeGrp, rate_name) # test whether each slope is different from zero for each sizeGrp
 # yes, all different to zero
 emmeans::contrast(sizeGrp_slopes, by = "rate_name", method = "pairwise", adjustment = "none") # pairwise test whether slopes differ significantly across rate types and grps
   # yes, clearance: meso-macro
@@ -209,6 +211,8 @@ params <- data.frame(sizeGrp_slopes) %>%
 n_obs <- mdat %>%
   count(rate_name, sizeGrp)
 
+n_obs %>% arrange(sizeGrp, rate_name)
+
 # Get Q10
 sizeGrp_slopes_Q10 <- as.data.frame(sizeGrp_slopes) %>% 
   # Calculate Q10s
@@ -219,8 +223,8 @@ sizeGrp_slopes_Q10 <- as.data.frame(sizeGrp_slopes) %>%
   mutate(refT = 15 + 273.15, # reference temp in Kelvin
          k = 8.617e-5, # Boltzmann's constant as eV/K-1
          R = 8.314 / 1000, # Ideal gas constant as kJ mol-1
-         Ea_eV = k * log(Q10) * (refT * (refT + 10)) / 10, # Ea as eV
-         Ea_kJ.mol =  (R) * log(Q10) * (refT * (refT + 10)) / 10 # Ea as kJ/mol-1
+         Ea_eV = round(k * log(Q10) * (refT * (refT + 10)) / 10, digits = 2), # Ea as eV
+         Ea_kJ.mol =  round((R) * log(Q10) * (refT * (refT + 10)) / 10) # Ea as kJ/mol-1
          ) %>%
   select(- c(k, R, df, refT, asymp.LCL, asymp.UCL)) %>%
   left_join(n_obs, by = c("rate_name", "sizeGrp")) %>% 
@@ -275,13 +279,14 @@ PlotLMM = function(model){
 
     facet_wrap(~rate_name, scales = "free",
                labeller = as_labeller(c(
-                 "Clearance"   = "bold(Clearance~rate~(ml~mgC^-1~h^-1))",
-                 "Ingestion"   = "bold(Ingestion~rate~(mgC~mgC^-1~h^-1))",
-                 "Growth"      = "bold(Growth~rate~(mgC~mgC^-1~h^-1))",
-                 "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))",
-                 "Excretion"   = "bold(Excretion~rate~('mgN-NH'[4]^'+'~mgC^-1~h^-1))"
+                 "Clearance"   = "bold(Clearance~(ml~mgC^-1~h^-1))",
+                 "Ingestion"   = "bold(Ingestion~(mgC~mgC^-1~h^-1))",
+                 "Growth"      = "bold(Growth~(mgC~mgC^-1~h^-1))",
+                 "Respiration" = "bold(Respiration~(µlO[2]~mgC^-1~h^-1))",
+                 "Excretion"   = "bold(Excretion~('mgN-NH'[4]^'+'~mgC^-1~h^-1))"
                ), 
-               label_parsed))+ 
+               label_parsed),
+               ncol = 1)+ 
     scale_fill_manual(values = grp_cols, labels = c("Mesozooplankton", "Macrozooplankton")) +
     scale_colour_manual(values = grp_cols, labels = c("Mesozooplankton", "Macrozooplankton")) +
     coord_cartesian(xlim = c(-2, 32)) +
@@ -309,7 +314,7 @@ tempPlot
 sizeGQ10plot <- ggplot() +
   geom_errorbar(data = sizeGrp_slopes_Q10, 
                 aes(x = sizeGrp, ymin = Q10_lwr, ymax = Q10_upr, colour = sizeGrp),
-                width = .05,
+                width = .1,
                 linewidth = 1) +
   geom_point(data = sizeGrp_slopes_Q10, aes(x = sizeGrp, y = Q10),
              size = 3,
@@ -324,13 +329,14 @@ sizeGQ10plot <- ggplot() +
             size = 3.5, colour = "grey40") +
   facet_wrap(~rate_name, scales = "free",
              labeller = as_labeller(c(
-               "Clearance"   = "bold(Clearance~rate~(ml~mgC^-1~h^-1))",
-               "Ingestion"   = "bold(Ingestion~rate~(mgC~mgC^-1~h^-1))",
-               "Growth"      = "bold(Growth~rate~(mgC~mgC^-1~h^-1))",
-               "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))",
-               "Excretion"   = "bold(Excretion~rate~('mgN-NH'[4]^'+'~mgC^-1~h^-1))"
+               "Clearance"   = "bold(Clearance~(ml~mgC^-1~h^-1))",
+               "Ingestion"   = "bold(Ingestion~(mgC~mgC^-1~h^-1))",
+               "Growth"      = "bold(Growth~(mgC~mgC^-1~h^-1))",
+               "Respiration" = "bold(Respiration~(µlO[2]~mgC^-1~h^-1))",
+               "Excretion"   = "bold(Excretion~('mgN-NH'[4]^'+'~mgC^-1~h^-1))"
              ), 
-             label_parsed)) + 
+             label_parsed), 
+             ncol = 1) + 
   scale_colour_manual(values = grp_cols, labels = c("Mesozooplankton", "Macrozooplankton")) +
   labs(x = "Size group",
        y = bquote(bold("Carbon-mass specific Q"[10])),
@@ -340,13 +346,14 @@ sizeGQ10plot <- ggplot() +
     strip.background = element_rect(fill = "whitesmoke", colour = "black"),
     axis.title = element_text(size = 11, face = "bold"),
     axis.text = element_text(size = 10),
-    legend.position = "none")
+    legend.position = "top")
 sizeGQ10plot
 
 
-tempPlot/sizeGQ10plot
+
+tempPlot+sizeGQ10plot
 
 # Save it
-# ggsave("Output/Figure3/Figure3_tempPlot.pdf", tempPlot, width = 160, height = 150, units = "mm", dpi = 300)
-# ggsave("Output/Figure3/Figure3_Q10Plot.pdf", sizeGQ10plot, width = 160, height = 120, units = "mm", dpi = 300)
+ggsave("Output/Figure3/Figure3_tempPlot.pdf", tempPlot, width = 75, height = 220, units = "mm", dpi = 300)
+ggsave("Output/Figure3/Figure3_Q10Plot.pdf", sizeGQ10plot, width = 75, height = 220, units = "mm", dpi = 300)
 

@@ -26,6 +26,11 @@ growth <- readRDS("Data/grwth_dat.rds")
 
 respiration <- readRDS("Data/resp_dat.rds") 
 
+excretion <- readRDS("Data/excrete_dat.rds") %>% 
+  mutate(food_type = NA,
+         food_conc = NA,
+         method = NA) # Unknown values
+
 # Size groups
 Sgroup_order <- c("Mesoplankton", "Macroplankton")
 
@@ -39,7 +44,7 @@ Zgroup_order <- c("Ctenophores", "Cnidarians", "Chaetognaths", "Molluscs",
 
 
 # Define my colour palette
-mycols <- c("Clearance" = "#66c2a5", "Ingestion" = "#fc8d62", "Growth" = "#8da0cb", "Respiration" = "#e78ac3")
+mycols <- c("Clearance" = "#66c2a5", "Ingestion" = "#fc8d62", "Growth" = "#8da0cb", "Respiration" = "#e78ac3", "Excretion" = "#ebbb54")
 
 
 
@@ -57,7 +62,9 @@ tempDat_binded <- bind_rows(
   temp_dat_summary(respiration, "respiration"),
   temp_dat_summary(growth, "growth"),
   temp_dat_summary(clearance, "clearance"),
-  temp_dat_summary(ingestion, "ingestion"))
+  temp_dat_summary(ingestion, "ingestion"),
+  temp_dat_summary(excretion, "excretion")
+  )
 
 
 # Summarise the data and calculate the proportion of data between 0 and 30 degC
@@ -65,19 +72,34 @@ tempDat_binded %>%
   distinct(Cspecific_rate, .keep_all = TRUE) %>% 
   summarise(
     n_total = n(),
-    n_temp_range = sum(temp_C >= 0 & temp_C <= 30, na.rm = TRUE),
+    n_temp_range = sum(temp_C >= -1 & temp_C <= 30, na.rm = TRUE),
     prop_temp_range = n_temp_range / n_total * 100)
 # Data between 0 and 30 degC
+# A tibble: 1 × 3
 # n_total n_temp_range prop_temp_range
-#    2327         2201            94.6
+#    3906         3585            91.8
 
+
+
+# What is the number of distinct records per rate?
+tempDat_binded %>% group_by(Dataset) %>% distinct(primRef) %>% count()
+# Dataset         n
+# 1 clearance      64
+# 2 excretion      27
+# 3 growth         54
+# 4 ingestion      43
+# 5 respiration    20
+
+# What is the number of distinct records?
+tempDat_binded %>% distinct(primRef) %>% nrow()
+# 167
 
 
 # What proportion of each dataset had the method report? ----
 # Quick function to select data across each dataset
 method_dat_summary <- function(data, dataset_name) {
   data %>%
-    select(ref_no, food_type, food_conc, method, locality) %>%
+    select(ref_no, food_type, food_conc, method) %>%
     mutate(Dataset = dataset_name)
 }
 
@@ -87,7 +109,9 @@ methodDat_binded <- bind_rows(
   method_dat_summary(respiration, "respiration"),
   method_dat_summary(growth, "growth"),
   method_dat_summary(clearance, "clearance"),
-  method_dat_summary(ingestion, "ingestion"))
+  method_dat_summary(ingestion, "ingestion"),
+  method_dat_summary(excretion, "excretion")
+)
 
 
 # Table S1 ----
@@ -115,30 +139,18 @@ methodDat_binded %>%
          ) %>% 
   group_by(method) %>%
   summarise(n = n(), .groups = "drop") %>%
-  mutate(prop_method = round(n / sum(n) * 100, digit = 0)) %>% 
+  mutate(prop_method = round(n / sum(n) * 100, digit = 1)) %>% 
   arrange(-prop_method)
 # Table S2 - Proportion of methods used for original data collection
 # method                    n         prop_method
-# Not reported           1581       66 
-# Controlled experiment   758       32 
-# In situ experiment       56        2
+# 1 Not reported           3358        80.5
+# 2 Controlled experiment   760        18.2
+# 3 In situ experiment       56         1.3
 
 
 # How many total observations?
-1581 + 758 + 56
-  # 2395
-
-# What is the number of distinct records per rate?
-tempDat_binded %>% group_by(Dataset) %>% distinct(primRef) %>% count()
-# Dataset         n
-# 1 clearance      64
-# 2 growth         54
-# 3 ingestion      43
-# 4 respiration    19
-
-# What is the number of distinct records?
-tempDat_binded %>% distinct(primRef) %>% nrow()
-# 140
+3358 + 760 + 56
+  # 4174
 
 
 # Table 1 ---
@@ -149,30 +161,52 @@ clearance_coverage <- summarise_taxonomic_coverage(clearance, "Clearance")
 ingestion_coverage <- summarise_taxonomic_coverage(ingestion, "Ingestion")
 growth_coverage <- summarise_taxonomic_coverage(growth, "Growth")
 respiration_coverage <- summarise_taxonomic_coverage(respiration, "Respiration")
+excretion_coverage <- summarise_taxonomic_coverage(excretion, "Excretion")
 
 
 # Combine outputs into a summary table
-taxonomic_coverage <- bind_rows(clearance_coverage, ingestion_coverage, growth_coverage, respiration_coverage)
-taxonomic_coverage
+taxonomic_coverage <- bind_rows(clearance_coverage, ingestion_coverage, growth_coverage, respiration_coverage, excretion_coverage)
+library(tidyverse)
 
-# Table S2
-# Dataset     n_phylas n_classes n_orders n_families n_genera n_species n_observations n_records
-# 1 Clearance          5         8       12         27       35        65            618        64
-# 2 Ingestion          3         5        7         16       21        44            307        43
-# 3 Growth             5         7       15         27       30        44            488        54
-# 4 Respiration        4         7       15         39       55       103            982        19
+taxonomic_coverage_long <- taxonomic_coverage %>%
+  pivot_longer(cols = -Dataset, names_to = "Groups", values_to = "value") %>%
+  mutate(Groups = case_when(Groups == "n_phylas"       ~ "Phyla",
+                            Groups == "n_classes"      ~ "Classes",
+                            Groups == "n_orders"       ~ "Orders",
+                            Groups == "n_families"     ~ "Families",
+                            Groups == "n_genera"       ~ "Genera",
+                            Groups == "n_species"      ~ "Species",
+                            Groups == "n_observations" ~ "Observations",
+                            Groups == "n_records"      ~ "Total records")) %>%
+  pivot_wider(names_from = Dataset,
+              values_from = value) %>%
+  mutate(Groups = factor(Groups, levels = c("Phyla", "Classes", "Orders", "Families", "Genera", "Species", "Observations", "Total records"))) %>%
+  arrange(Groups)
+
+taxonomic_coverage_long
+# Table S1
+# Groups        Clearance Ingestion Growth Respiration Excretion
+# 1 Phyla                 5         3      5           4         5
+# 2 Classes               8         5      7           7         8
+# 3 Orders               12         7     15          15        16
+# 4 Families             27        16     27          39        49
+# 5 Genera               35        21     30          55        79
+# 6 Species              65        44     44         103       117
+# 7 Observations        618       307    488         978      1783
+# 8 Total records        64        43     54          20        27
 
 # Total nobs
-618 + 307 + 488 + 982 
-  # 2395, perfect. matches previous count
+618 + 307 + 488 + 978 + 1783
+  # 4174, perfect. matches previous count
 
 # number of observations pre-cleaning were... 
 # Clearance   1580
 # Ingestion    471
 # Growth       686
 # Respiration 1036
+# Excretion - taken from separate database
 
-allDat <- bind_rows(clearance, ingestion, growth, respiration) %>% 
+allDat <- bind_rows(clearance, ingestion, growth, respiration, excretion) %>% 
   mutate(primRef = factor(primRef))
 
 allDat %>% # How many total unique groups/obs/records are there?
@@ -184,10 +218,8 @@ allDat %>% # How many total unique groups/obs/records are there?
     totalFamily = n_distinct(family),
     totalGenera = n_distinct(genus),
     totalSpecies = n_distinct(species))
-
 #   totalPhylum totalClass totalOrder totalFamily totalGenera totalSpecies
-#   1           5          9         21          54          82          167
-
+#       5          9         22          73         118          225
 
 
 # Taxonomic composition by zoopGrp ----
@@ -228,17 +260,27 @@ respiration_by_Sgroup <- respiration %>%
   filter(!sizeGrp == "OTHER") %>% # exclude unclassified zooplankton
   arrange(sizeGrp)
 
+excretion_by_Sgroup <- excretion %>%
+  group_by(sizeGrp) %>% 
+  summarise(dataset = "Excretion",
+            n_species = n_distinct(species),
+            n_observations = n(),
+            .groups = "drop") %>% 
+  filter(!sizeGrp == "OTHER") %>% # exclude unclassified zooplankton
+  arrange(sizeGrp)
+
 
 # Print summaries
 clearance_by_Sgroup
 ingestion_by_Sgroup
 growth_by_Sgroup
 respiration_by_Sgroup
+excretion_by_Sgroup
 
 
 # Combine the summaries and plot it up
-all_Sgroups <- bind_rows(clearance_by_Sgroup, ingestion_by_Sgroup, growth_by_Sgroup, respiration_by_Sgroup) %>%
-  mutate(dataset = factor(dataset, levels = c("Clearance",  "Ingestion", "Growth", "Respiration")),
+all_Sgroups <- bind_rows(clearance_by_Sgroup, ingestion_by_Sgroup, growth_by_Sgroup, respiration_by_Sgroup, excretion_by_Sgroup) %>%
+  mutate(dataset = factor(dataset, levels = c("Clearance",  "Ingestion", "Growth", "Respiration", "Excretion")),
          sizeGrp = factor(sizeGrp, levels = Sgroup_order), # use group order
          sizeGrp = recode(sizeGrp,
                           "Mesoplankton" = "Mesozooplankton",
@@ -253,10 +295,10 @@ SgrpFreqPlot <- ggplot(all_Sgroups,
             position = position_dodge(width = 0.9, reverse = TRUE),
             hjust = -0.5, size = 3.5) +
   scale_fill_manual(values = mycols) +
-  scale_y_continuous(expand = expansion(mult = c(0, 0.10))) +
+  scale_y_log10(expand = expansion(mult = c(0, 0.10))) +
   coord_flip() +
   labs(x = expression(bold("Zooplankton size")),
-       y = expression(bold("Number of observations")),
+       y = expression(bold("Number of observations (log10)")),
        fill = "Dataset") +
   theme_bw(base_size = 12) +
   theme(legend.position = "top",
@@ -267,7 +309,7 @@ SgrpFreqPlot <- ggplot(all_Sgroups,
 SgrpFreqPlot
 
 # Save it
-ggsave("Output/Figure_1_sizeGrps.pdf", SgrpFreqPlot, width = 160, height = 80, units = "mm", dpi = 300)
+ggsave("Output/Figure1/Figure_1_sizeGrps.pdf", SgrpFreqPlot, width = 160, height = 80, units = "mm", dpi = 300)
 
 
 
@@ -317,16 +359,29 @@ respiration_by_Fgroup <- respiration %>%
   arrange(funcGrp)
 
 
+excretion_by_Fgroup <- excretion %>%
+  group_by(funcGrp) %>% 
+  filter(n() >= 15, # Exclude funcGrp that don't have suitable data or temp ranges
+         max(temp_C) - min(temp_C) >= 5) %>%
+  summarise(dataset = "Excretion",
+            n_species = n_distinct(species),
+            n_observations = n(),
+            .groups = "drop") %>% 
+  filter(!funcGrp == "OTHER") %>% # exclude unclassified zooplankton
+  arrange(funcGrp)
+
+
   # Print summaries
   clearance_by_Fgroup
   ingestion_by_Fgroup
   growth_by_Fgroup
   respiration_by_Fgroup
+  excretion_by_Fgroup
 
 
 # Combine the summaries and plot it up
-all_Fgroups <- bind_rows(clearance_by_Fgroup, ingestion_by_Fgroup, growth_by_Fgroup, respiration_by_Fgroup) %>%
-  mutate(dataset = factor(dataset, levels = c("Clearance",  "Ingestion", "Growth", "Respiration")),
+all_Fgroups <- bind_rows(clearance_by_Fgroup, ingestion_by_Fgroup, growth_by_Fgroup, respiration_by_Fgroup, excretion_by_Fgroup) %>%
+  mutate(dataset = factor(dataset, levels = c("Clearance",  "Ingestion", "Growth", "Respiration", "Excretion")),
          funcGrp = factor(funcGrp, levels = Fgroup_order))  # use group order
 
 
@@ -339,14 +394,14 @@ FgrpFreqPlot <- ggplot(all_Fgroups,
     position = position_dodge(width = 0.9, reverse = TRUE),
     hjust = -0.5, size = 3.5) +
   scale_fill_manual(values = mycols) +
-  scale_y_continuous(expand = expansion(mult = c(0, 0.10))) +
+  scale_y_log10(expand = expansion(mult = c(0, 0.10))) +
   scale_x_discrete(labels = c("CrustOthers" = str_wrap("Crustaceans and others", width = 10),
                               "GelPreds" = str_wrap("Gelatinous predators", width = 10),
                               "GelFilter" = str_wrap("Gelatinous filter-feeders", width = 10))) +
   coord_flip() +
   labs(
     x = expression(bold("Functional group")),
-    y = expression(bold("Number of observations")),
+    y = expression(bold("Number of observations (log10)")),
     fill = "Dataset") +
   theme_bw(base_size = 12) +
   theme(
@@ -358,7 +413,7 @@ FgrpFreqPlot <- ggplot(all_Fgroups,
 FgrpFreqPlot
 
 # Save it
-ggsave("Output/Figure_1_funcGrps.pdf", FgrpFreqPlot, width = 160, height = 80, units = "mm", dpi = 300)
+ggsave("Output/Figure1/Figure_1_funcGrps.pdf", FgrpFreqPlot, width = 160, height = 80, units = "mm", dpi = 300)
 
 
 
@@ -407,47 +462,56 @@ respiration_by_Zgroup <- respiration %>%
   arrange(zoopGrp)
 
 
+excretion_by_Zgroup <- excretion %>%
+  group_by(zoopGrp) %>% 
+  filter(n() >= 15, # Exclude zoopGrps that don't have suitable data or temp ranges
+         max(temp_C) - min(temp_C) >= 5) %>%
+  summarise(dataset = "Excretion",
+            n_species = n_distinct(species),
+            n_observations = n(),
+            .groups = "drop") %>% 
+  arrange(zoopGrp)
+
+
   # Print summaries
   clearance_by_Zgroup
   ingestion_by_Zgroup
   growth_by_Zgroup
   respiration_by_Zgroup
+  excretion_by_Zgroup
 
   
 # Combine the summaries and plot it up
-all_Zgroups <- bind_rows(clearance_by_Zgroup, ingestion_by_Zgroup, growth_by_Zgroup, respiration_by_Zgroup) %>%
-  mutate(dataset = factor(dataset, levels = c("Clearance", "Ingestion", "Growth", "Respiration")),
+all_Zgroups <- bind_rows(clearance_by_Zgroup, ingestion_by_Zgroup, growth_by_Zgroup, respiration_by_Zgroup, excretion_by_Zgroup) %>%
+  mutate(dataset = factor(dataset, levels = c("Clearance", "Ingestion", "Growth", "Respiration", "Excretion")),
          zoopGrp = factor(zoopGrp, levels = Zgroup_order))  # use group order
 
   
 # ZoopGrps
 ZgrpFreqPlot <- ggplot(all_Zgroups,
-                   aes(x = fct_rev(zoopGrp), y = n_observations, fill = dataset)) +
-  geom_col(position = position_dodge(width = .9, reverse = TRUE)) +
+                       aes(x = fct_rev(zoopGrp), y = n_observations, fill = dataset)) +
+  geom_col(position = position_dodge(width = 0.9, preserve = "single", reverse = TRUE), width = 0.9) +
   geom_text(
     aes(label = n_species),
     position = position_dodge(width = 0.9, reverse = TRUE),
-    hjust = -0.5, size = 3.5) +
+    hjust = -0.3, size = 3) +
   scale_fill_manual(values = mycols) +
-  scale_y_continuous(expand = expansion(mult = c(0, 0.25))) +
+  scale_y_log10(expand = expansion(mult = c(0, 0.2))) +
   coord_flip() +
   labs(
     x = expression(bold("Zooplankton group")),
-    y = expression(bold("Number of observations")),
+    y = expression(bold("Number of observations (log10)")),
     fill = "Dataset") +
   theme_bw(base_size = 12) +
   theme(
     legend.position = "top",
     legend.title = element_text(size = 12, face = "bold"),
-    panel.grid.major.y = element_blank(),
-    strip.text = element_text(size = 10, face = "bold"),
-    strip.background = element_rect(fill = "whitesmoke", colour = "black")) +
-  facet_wrap(~ dataset, nrow = 1)
+    panel.grid.major.y = element_blank())
 
 ZgrpFreqPlot
 
 # Save it
-ggsave("Output/Figure_1_zoopGrps.pdf", ZgrpFreqPlot, width = 160, height = 80, units = "mm", dpi = 300)
+ggsave("Output/Figure1/Figure_1_zoopGrps.pdf", ZgrpFreqPlot, width = 160, height = 100, units = "mm", dpi = 300)
 
 
 
@@ -466,8 +530,8 @@ Fig1_combined <- SgrpFreqPlot_no_y + FgrpFreqPlot_no_y + ZgrpFreqPlot +
 
 Fig1_combined
 
-ggsave("Output/Figure_1_FreqPlots.pdf", Fig1_combined, width = 180, height = 165, units = "mm", dpi = 300)
-ggsave("Output/Figure_1_FreqPlots.png", Fig1_combined, width = 180, height = 165, units = "mm", dpi = 300)
+# ggsave("Output/Figure_1_FreqPlots.pdf", Fig1_combined, width = 180, height = 165, units = "mm", dpi = 300)
+# ggsave("Output/Figure_1_FreqPlots.png", Fig1_combined, width = 180, height = 165, units = "mm", dpi = 300)
 
 
 

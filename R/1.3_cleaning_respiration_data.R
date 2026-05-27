@@ -208,7 +208,8 @@ datFinal <- datClean %>%
   relocate(Cspecific_rate, .after = rate_name) %>%
   relocate(Cspecific_unit, .after = Cspecific_rate) %>% 
   relocate(rate_value_clean, .after = Cspecific_unit) %>% 
-  relocate(rate_unit_clean, .after = rate_value_clean)
+  relocate(rate_unit_clean, .after = rate_value_clean) %>% 
+  filter(Cspecific_rate < 75)
 glimpse(datFinal)
 
 # End harmonisation and conversion ----

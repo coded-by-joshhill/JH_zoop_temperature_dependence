@@ -97,6 +97,8 @@ mdat <- usedat %>%
   ungroup() %>% 
   mutate(ln_Cspecific_rate = log(Cspecific_rate)) # log transform mass-specific rate
 
+# Save mdat so we can estimate number of taxa for ratios later...
+# saveRDS(mdat, file = "Data/modelParameters/funcGrp_mdat.rds")
 
 # Quick look
 mdat %>% 
@@ -175,13 +177,13 @@ m3_m3 <- update(m3, REML = FALSE)
 anova(m2_m2, m3_m3) # test if the three-way interaction is better than the two-way interaction without random slope for primRef
   # Yep, m2 with 3-way interaction is better
 
-# we will progress with m1
+# we will progress with m2
 summary(m2)
 
 
 # Extract slopes using and calculate Q10 for each funcGrp ----
 funcGrp_slopes <- emtrends(m2, ~ rate_name * funcGrp, var = "temp_C")
-summary(funcGrp_slopes, infer = TRUE) # test whether each slope is different from zero for each zoopGrp
+summary(funcGrp_slopes, infer = TRUE) %>% arrange(funcGrp, rate_name) # test whether each slope is different from zero for each zoopGrp
 # No significant temp relationships for: (may due to limited data across the temp range?)
   # GelPreds, clearance
   # GelPreds, ingestion
@@ -202,7 +204,6 @@ emmeans::contrast(funcGrp_slopes, by = "rate_name", method = "pairwise", adjustm
 # Extract intercepts ----
 funcGrp_intercepts <- data.frame(emmeans(m2, ~ rate_name * funcGrp, var = "temp_C"))
 
-
 # Build a parameter dataframe and to estimate ratios
 params <- data.frame(funcGrp_slopes) %>% 
   rename(slope = temp_C.trend) %>% 
@@ -219,6 +220,7 @@ params <- data.frame(funcGrp_slopes) %>%
 # Get n
 n_obs <- mdat %>%
   count(rate_name, funcGrp)
+n_obs %>% arrange(funcGrp, rate_name)
 
 # Get Q10
 funcGrp_slopes_Q10 <- as.data.frame(funcGrp_slopes) %>% 
@@ -230,8 +232,8 @@ funcGrp_slopes_Q10 <- as.data.frame(funcGrp_slopes) %>%
   mutate(refT = 15 + 273.15, # reference temp in Kelvin
          k = 8.617e-5, # Boltzmann's constant as eV/K-1
          R = 8.314 / 1000, # Ideal gas constant as kJ mol-1
-         Ea_eV = k * log(Q10) * (refT * (refT + 10)) / 10, # Ea as eV
-         Ea_kJ.mol =  (R) * log(Q10) * (refT * (refT + 10)) / 10 # Ea as kJ/mol-1
+         Ea_eV = round(k * log(Q10) * (refT * (refT + 10)) / 10, digits = 2), # Ea as eV
+         Ea_kJ.mol =  round((R) * log(Q10) * (refT * (refT + 10)) / 10, digits = 2) # Ea as kJ/mol-1
          ) %>%
   select(- c(k, R, df, refT, asymp.LCL, asymp.UCL)) %>%
   left_join(n_obs, by = c("rate_name", "funcGrp")) %>% 
@@ -287,13 +289,14 @@ PlotLMM = function(model){
               linewidth = 1) +
     facet_wrap(~rate_name, scales = "free",
                labeller = as_labeller(c(
-                 "Clearance"   = "bold(Clearance~rate~(ml~mgC^-1~h^-1))",
-                 "Ingestion"   = "bold(Ingestion~rate~(mgC~mgC^-1~h^-1))",
-                 "Growth"      = "bold(Growth~rate~(mgC~mgC^-1~h^-1))",
-                 "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))",
-                 "Excretion"   = "bold(Excretion~rate~('mgN-NH'[4]^'+'~mgC^-1~h^-1))"
+                 "Clearance"   = "bold(Clearance~(ml~mgC^-1~h^-1))",
+                 "Ingestion"   = "bold(Ingestion~(mgC~mgC^-1~h^-1))",
+                 "Growth"      = "bold(Growth~(mgC~mgC^-1~h^-1))",
+                 "Respiration" = "bold(Respiration~(µlO[2]~mgC^-1~h^-1))",
+                 "Excretion"   = "bold(Excretion~('mgN-NH'[4]^'+'~mgC^-1~h^-1))"
                ), 
-               label_parsed))+ 
+               label_parsed),
+               ncol = 1)+ 
     coord_cartesian(xlim = c(-2, 32)) +
     scale_fill_manual(values = grp_cols, labels = c("Crustaceans" , "Gelatinious predators", "Gelatinious filter-feeders")) +
     scale_colour_manual(values = grp_cols, labels = c("Crustaceans" , "Gelatinious predators", "Gelatinious filter-feeders")) +
@@ -336,13 +339,14 @@ funcGQ10plot <- ggplot() +
             size = 3.5, colour = "grey40") +
   facet_wrap(~rate_name, scales = "free",
              labeller = as_labeller(c(
-               "Clearance"   = "bold(Clearance~rate~(ml~mgC^-1~h^-1))",
-               "Ingestion"   = "bold(Ingestion~rate~(mgC~mgC^-1~h^-1))",
-               "Growth"      = "bold(Growth~rate~(mgC~mgC^-1~h^-1))",
-               "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))",
-               "Excretion"   = "bold(Excretion~rate~('mgN-NH'[4]^'+'~mgC^-1~h^-1))"
+               "Clearance"   = "bold(Clearance~(ml~mgC^-1~h^-1))",
+               "Ingestion"   = "bold(Ingestion~(mgC~mgC^-1~h^-1))",
+               "Growth"      = "bold(Growth~(mgC~mgC^-1~h^-1))",
+               "Respiration" = "bold(Respiration~(µlO[2]~mgC^-1~h^-1))",
+               "Excretion"   = "bold(Excretion~('mgN-NH'[4]^'+'~mgC^-1~h^-1))"
              ), 
-             label_parsed)) +
+             label_parsed),
+             ncol = 1) +
   scale_colour_manual(values = grp_cols) +
   labs(x = "Functional group",
        y = bquote(bold("Carbon-mass specific Q"[10])),
@@ -351,7 +355,7 @@ funcGQ10plot <- ggplot() +
     strip.background = element_rect(fill = "whitesmoke", colour = "black"),
     axis.title = element_text(size = 11, face = "bold"),
     axis.text = element_text(size = 10),
-    legend.position = "none"
+    legend.position = "top"
   )
 funcGQ10plot
 # confidence intervals are not good to visualise, we will break the y-axes to better compared estimates
@@ -359,19 +363,19 @@ funcGQ10plot
 library(ggbreak) # to break y-axis on massive Q10 variance
 funcG10plot_break <- funcGQ10plot +
   geom_text(data = filter(funcGrp_slopes_Q10, 
-                          (rate_name == "Ingestion" & Q10_upr > 6) |
-                          (rate_name == "Respiration" & Q10_upr > 6) |
-                          (rate_name == "Growth" & Q10_upr > 6) |
-                          (rate_name == "Clearance" & Q10_upr > 6)),
-            aes(x = funcGrp, y = 5.85, label = paste0("↑ ", round(Q10_upr, 0))),
+                          (rate_name == "Ingestion" & Q10_upr > 5) |
+                          (rate_name == "Respiration" & Q10_upr > 5) |
+                          (rate_name == "Growth" & Q10_upr > 5) |
+                          (rate_name == "Clearance" & Q10_upr > 5)),
+            aes(x = funcGrp, y = 4.85, label = paste0("↑ ", round(Q10_upr, 0))),
             colour = "grey40", size = 4,
             nudge_x = 0.3) +
-  coord_cartesian(ylim = c(-1, 6))
+  coord_cartesian(ylim = c(-1, 5))
 funcG10plot_break
 
-tempPlot/funcG10plot_break
+tempPlot + funcG10plot_break
 
 # Save it
-# ggsave("Output/Figure4/Figure4_tempPlot.pdf", tempPlot, width = 160, height = 150, units = "mm", dpi = 300)
-# ggsave("Output/Figure4/Figure4_Q10Plot.pdf", funcG10plot_break, width = 160, height = 120, units = "mm", dpi = 300)
+ggsave("Output/Figure4/Figure4_tempPlot.pdf", tempPlot, width = 75, height = 220, units = "mm", dpi = 300)
+ggsave("Output/Figure4/Figure4_Q10Plot.pdf", funcG10plot_break, width = 75, height = 220, units = "mm", dpi = 300)
 

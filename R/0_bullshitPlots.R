@@ -105,3 +105,18 @@ excredat <- readRDS("Data/excrete_dat.rds") %>%
 
 
 # Combine them into one...
+# Combine them into one dataframe
+usedat <- rbind(cleardat, ingdat, grwdat, respdat, excredat) %>% 
+  filter_out(sizeGrp == "OTHER" | is.na(temp_C)) %>%  # filter out the size group "OTHER" and remove any NAs in temp_C
+  mutate(sizeGrp = fct_relevel(sizeGrp, group_order)) # reorder sizeGrp
+
+usedat %>%
+  group_by(zoopGrp, rate_name) %>%
+  summarise(
+    avg = mean(Cspecific_rate, na.rm = TRUE),
+    min = min(Cspecific_rate,  na.rm = TRUE),
+    max = max(Cspecific_rate,  na.rm = TRUE),
+    n   = n(),
+    .groups = "drop"
+  ) %>%
+  arrange(rate_name, avg) %>% print(n="Inf")

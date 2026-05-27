@@ -106,6 +106,8 @@ usedat %>%
 mdat <- usedat %>% 
   mutate(ln_Cspecific_rate = log(Cspecific_rate)) # log transform mass-specific rate and save as new variable
 
+# Save mdat so we can estimate number of taxa for ratios later...
+# saveRDS(mdat, file = "Data/modelParameters/allZoop_mdat.rds")
 
 # Quick look
 mdat %>% 
@@ -125,7 +127,6 @@ summary(mdat)
 
  # My main question here is...
   # How does temperature dependence vary across each rate for zooplankton in general?
-
 
 
 # Fit the models ----
@@ -187,7 +188,7 @@ anova(m2_m2, m3_m3) # test which random effects structure is a better fit
 summary(m2)
 r.squaredGLMM(m2)
 # R2m       R2c
-# 0.9184957 0.9825001
+# 0.9204386 0.9836227
 
 # Extract slopes and calculate Q10 for all zooplankton ----
 slopes <- emmeans::emtrends(m2, ~ rate_name, var = "temp_C")
@@ -197,6 +198,7 @@ emmeans::contrast(slopes, method = "pairwise", adjust = "mvt") # pairwise test w
   # clearance - ingest
   # clearance - growth
   # clearance - respiration
+  # clearance - excretion
 # Makes sense I guess... clearance is technically not an energy budget term compared to the others
 
 # Extract intercepts ----
@@ -270,7 +272,7 @@ PlotLMM = function(model){
   ggplot() +
     geom_point(data = mdat,
                aes(x = temp_C, y = ln_Cspecific_rate), colour = "grey27",
-               alpha = 0.2) +
+               alpha = 0.1) +
     geom_ribbon(data = pop_preds,
                 aes(x = temp_C, ymin = conf.low, ymax = conf.high), fill = "midnightblue",
                 alpha = 0.25) +
@@ -279,13 +281,13 @@ PlotLMM = function(model){
               linewidth = 1) +
     facet_wrap(~rate_name, scales = "free",
                labeller = as_labeller(c(
-                 "Clearance"   = "bold(Clearance~rate~(ml~mgC^-1~h^-1))",
-                 "Ingestion"   = "bold(Ingestion~rate~(mgC~mgC^-1~h^-1))",
-                 "Growth"      = "bold(Growth~rate~(mgC~mgC^-1~h^-1))",
-                 "Respiration" = "bold(Respiration~rate~(µlO[2]~mgC^-1~h^-1))",
-                 "Excretion"   = "bold(Excretion~rate~('mgN-NH'[4]^'+'~mgC^-1~h^-1))"
+                 "Clearance"   = "bold(Clearance~(ml~mgC^-1~h^-1))",
+                 "Ingestion"   = "bold(Ingestion~(mgC~mgC^-1~h^-1))",
+                 "Growth"      = "bold(Growth~(mgC~mgC^-1~h^-1))",
+                 "Respiration" = "bold(Respiration~(µlO[2]~mgC^-1~h^-1))",
+                 "Excretion"   = "bold(Excretion~('mgN-NH'[4]^'+'~mgC^-1~h^-1))"
                ), 
-               label_parsed))+ 
+               label_parsed), ncol = 1)+ 
     coord_cartesian(xlim = c(-2, 32)) +
     labs(x = "Temp (°C)",
          y = "ln (Carbon-mass specific rate)") +
@@ -312,7 +314,7 @@ allZoopQ10plot <- ggplot() +
   geom_errorbar(data = slopes_Q10, 
                 aes(x = rate_name, ymin = Q10_lwr, ymax = Q10_upr), 
                 colour = "grey",
-                width = 0.05, linewidth = 1) +
+                width = 0.2, linewidth = 1) +
   geom_point(data = slopes_Q10, 
              aes(x = rate_name, y = Q10),
              size = 4, colour = "midnightblue") +
@@ -328,17 +330,18 @@ allZoopQ10plot <- ggplot() +
        y = bquote(bold("Carbon-mass specific Q"[10]))) +
   theme(
     axis.title = element_text(size = 11, face = "bold"),
-    axis.text = element_text(size = 10)
+    axis.text = element_text(size = 10),
+    axis.text.x = element_text(angle = 25, hjust = 1)
   )
 
 allZoopQ10plot
 
 
-fig2 <- tempPlot/allZoopQ10plot +
+fig2 <- tempPlot+allZoopQ10plot +
   plot_layout(guides = "collect")
 fig2
 
 
 # Save the plots ----
-# ggsave("Output/Figure2/Figure2_tempPlot.pdf", tempPlot, width = 160, height = 150, units = "mm", dpi = 300)
-# ggsave("Output/Figure2/Figure2_Q10Plot.pdf", allZoopQ10plot, width = 160, height = 70, units = "mm", dpi = 300)
+ggsave("Output/Figure2/Figure2_tempPlot.pdf", tempPlot, width = 70, height = 180, units = "mm", dpi = 300)
+ggsave("Output/Figure2/Figure2_Q10Plot.pdf", allZoopQ10plot, width = 80, height = 180, units = "mm", dpi = 300)

@@ -113,6 +113,9 @@ mdat <- usedat %>%
   ungroup() %>% 
   mutate(ln_Cspecific_rate = log(Cspecific_rate)) # log transform mass-specific rate
 
+# Save mdat so we can estimate number of taxa for ratios later...
+# saveRDS(mdat, file = "Data/modelParameters/zoopGrp_mdat.rds")
+
 
 # Quick look
 mdat %>% 
@@ -218,6 +221,13 @@ plot(sim) # looks pretty good overall
 summary(m_respiration)
 
 
+# Excretion
+sim <- simulateResiduals(m_excretion)
+plot(sim) # looks pretty good overall
+summary(m_excretion)
+
+
+
 # Extract coefficients and calculate Q10 for each zoopGrp ----
 ## Clearance ----
 clear_slopes <- emtrends(m_clearance, ~zoopGrp, var = "temp_C")
@@ -236,7 +246,7 @@ clearance_params <- data.frame(clear_slopes) %>%
   select(-c(SE, df, asymp.LCL, asymp.UCL))
 
 # Save the parameter data for later
-# saveRDS(clearance_params, file = "Data/modelParameters/ZGrpClearanceEstimates.rds")
+saveRDS(clearance_params, file = "Data/modelParameters/ZGrpClearanceEstimates.rds")
 
 # Get n
 n_obs_clearance <- d_clearance %>%
@@ -252,8 +262,8 @@ clearanceQ10 <- as.data.frame(clear_slopes) %>%
   mutate(refT = 15 + 273.15, # reference temp in Kelvin
          k = 8.617e-5, # Boltzmann's constant as eV/K-1
          R = 8.314 / 1000, # Ideal gas constant as kJ mol-1
-         Ea_eV = k * log(Q10) * (refT * (refT + 10)) / 10, # Ea as eV
-         Ea_kJ.mol =  (R) * log(Q10) * (refT * (refT + 10)) / 10) %>% # Ea as kJ/mol-1
+         Ea_eV = round(k * log(Q10) * (refT * (refT + 10)) / 10, digits = 2), # Ea as eV
+         Ea_kJ.mol =  round((R) * log(Q10) * (refT * (refT + 10)) / 10), digits = 2) %>% # Ea as kJ/mol-1
   select(- c(k, R, df, refT, asymp.LCL, asymp.UCL)) %>%
   left_join(n_obs_clearance, by = "zoopGrp")
 clearanceQ10
@@ -278,7 +288,7 @@ ingest_params <- data.frame(ingest_slopes) %>%
   select(-c(SE, df, asymp.LCL, asymp.UCL))
 
 # Save the parameter data for later
-# saveRDS(ingest_params, file = "Data/modelParameters/ZGrpIngestionEstimates.rds")
+saveRDS(ingest_params, file = "Data/modelParameters/ZGrpIngestionEstimates.rds")
 
 # Get n
 n_obs_ingestion <- d_ingestion %>%
@@ -294,8 +304,8 @@ ingestionQ10 <- as.data.frame(ingest_slopes) %>%
   mutate(refT = 15 + 273.15, # reference temp in Kelvin
          k = 8.617e-5, # Boltzmann's constant as eV/K-1
          R = 8.314 / 1000, # Ideal gas constant as kJ mol-1
-         Ea_eV = k * log(Q10) * (refT * (refT + 10)) / 10, # Ea as eV
-         Ea_kJ.mol =  (R) * log(Q10) * (refT * (refT + 10)) / 10) %>% # Ea as kJ/mol-1
+         Ea_eV = round(k * log(Q10) * (refT * (refT + 10)) / 10, digits = 2), # Ea as eV
+         Ea_kJ.mol =  round((R) * log(Q10) * (refT * (refT + 10)) / 10), digits = 2) %>% # Ea as kJ/mol-1
   select(- c(k, R, df, refT, asymp.LCL, asymp.UCL)) %>%
   left_join(n_obs_ingestion, by = "zoopGrp")
 ingestionQ10
@@ -310,9 +320,8 @@ summary(growth_slopes, infer = TRUE)# test whether each slope is different from 
 # Sig differences for amphipods, copepods, euphausiids and thaliaceans
 emmeans::contrast(growth_slopes, method = "pairwise", adjust = "mvt") # pairwise test whether slopes differ significantly across groups
 # Sig differences for:  
-  # Cnidarians - Amphipods
-  # Cnidarians - Copepods 
-  #  Cnidarians - Euphausiids - Marginally significant (p = 0.052)
+  # Cnidarians - Amphipods    -0.12759 0.0296 Inf  -4.310  0.0003
+  # Cnidarians - Copepods     -0.10940 0.0261 Inf  -4.198  0.0005
 
 # Build a parameter dataframe to estimate ratios
 growth_params <- data.frame(growth_slopes) %>% 
@@ -323,7 +332,7 @@ growth_params <- data.frame(growth_slopes) %>%
   select(-c(SE, df, asymp.LCL, asymp.UCL))
 
 # Save the parameter data for later
-# saveRDS(growth_params, file = "Data/modelParameters/ZGrpGrowthEstimates.rds")
+saveRDS(growth_params, file = "Data/modelParameters/ZGrpGrowthEstimates.rds")
 
 # Get n
 n_obs_growth <- d_growth %>%
@@ -339,8 +348,8 @@ growthQ10 <- as.data.frame(growth_slopes) %>%
   mutate(refT = 15 + 273.15, # reference temp in Kelvin
          k = 8.617e-5, # Boltzmann's constant as eV/K-1
          R = 8.314 / 1000, # Ideal gas constant as kJ mol-1
-         Ea_eV = k * log(Q10) * (refT * (refT + 10)) / 10, # Ea as eV
-         Ea_kJ.mol =  (R) * log(Q10) * (refT * (refT + 10)) / 10) %>% # Ea as kJ/mol-1
+         Ea_eV = round(k * log(Q10) * (refT * (refT + 10)) / 10, digits = 2), # Ea as eV
+         Ea_kJ.mol =  round((R) * log(Q10) * (refT * (refT + 10)) / 10), digits = 2) %>% # Ea as kJ/mol-1
   select(- c(k, R, df, refT, asymp.LCL, asymp.UCL)) %>%
   left_join(n_obs_growth, by = "zoopGrp")
 growthQ10
@@ -355,9 +364,9 @@ summary(resp_slopes, infer = TRUE) # test whether each slope is different from z
 # All grps sig diff to zero
 emmeans::contrast(resp_slopes, method = "pairwise", adjust = "mvt") # pairwise test whether slopes differ significantly across groups
 # Sig differences for:
-  # ctenophores - cnidarians
-  # cnidarians- copepods
-  # cnidarians - euphausiids
+# Ctenophores - Cnidarians    0.1112 0.0232 Inf   4.801 <0.0001
+# Ctenophores - Euphausiids   0.0899 0.0246 Inf   3.658  0.0020
+# Copepods - Euphausiids      0.0420 0.0134 Inf   3.136  0.0115
 
 # Build a paramater dataframe to estimate ratios
 respiration_params <- data.frame(resp_slopes) %>% 
@@ -368,7 +377,7 @@ respiration_params <- data.frame(resp_slopes) %>%
   select(-c(SE, df, asymp.LCL, asymp.UCL))
 
 # Save the parameter data for later
-# saveRDS(respiration_params, file = "Data/modelParameters/ZGrpRespirationEstimates.rds")
+saveRDS(respiration_params, file = "Data/modelParameters/ZGrpRespirationEstimates.rds")
 
 # Get n
 n_obs_respiration <- d_respiration %>%
@@ -384,8 +393,8 @@ respQ10 <- as.data.frame(resp_slopes) %>%
   mutate(refT = 15 + 273.15, # reference temp in Kelvin
          k = 8.617e-5, # Boltzmann's constant as eV/K-1
          R = 8.314 / 1000, # Ideal gas constant as kJ mol-1
-         Ea_eV = k * log(Q10) * (refT * (refT + 10)) / 10, # Ea as eV
-         Ea_kJ.mol =  (R) * log(Q10) * (refT * (refT + 10)) / 10) %>% # Ea as kJ/mol-1
+         Ea_eV = round(k * log(Q10) * (refT * (refT + 10)) / 10, digits = 2), # Ea as eV
+         Ea_kJ.mol =  round((R) * log(Q10) * (refT * (refT + 10)) / 10), digits = 2) %>% # Ea as kJ/mol-1
   select(- c(k, R, df, refT, asymp.LCL, asymp.UCL)) %>%
   left_join(n_obs_respiration, by = "zoopGrp")
 respQ10
@@ -400,8 +409,8 @@ summary(excr_slopes, infer = TRUE) # test whether each slope is different from z
 # All sig diff except for mysiids and appendicularians
 emmeans::contrast(excr_slopes, method = "pairwise", adjust = "mvt") # pairwise test whether slopes differ significantly across groups
 # Sig differences for:
-  # Ctenophores - mysids
-  # Ctenophores - thaliaceans
+# Ctenophores - Mysids             0.141232 0.0455 Inf   3.103  0.0413
+# Ctenophores - Thaliaceans        0.094533 0.0294 Inf   3.217  0.0287
 
 # Build a paramater dataframe to estimate ratios
 excr_params <- data.frame(excr_slopes) %>% 
@@ -412,7 +421,7 @@ excr_params <- data.frame(excr_slopes) %>%
   select(-c(SE, df, asymp.LCL, asymp.UCL))
 
 # Save the parameter data for later
-# saveRDS(excr_params, file = "Data/modelParameters/ZGrpExcretionEstimates.rds")
+saveRDS(excr_params, file = "Data/modelParameters/ZGrpExcretionEstimates.rds")
 
 # Get n
 n_obs_excretion <- d_excretion %>%
@@ -428,8 +437,8 @@ excretionQ10 <- as.data.frame(excr_slopes) %>%
   mutate(refT = 15 + 273.15, # reference temp in Kelvin
          k = 8.617e-5, # Boltzmann's constant as eV/K-1
          R = 8.314 / 1000, # Ideal gas constant as kJ mol-1
-         Ea_eV = k * log(Q10) * (refT * (refT + 10)) / 10, # Ea as eV
-         Ea_kJ.mol =  (R) * log(Q10) * (refT * (refT + 10)) / 10) %>% # Ea as kJ/mol-1
+         Ea_eV = round(k * log(Q10) * (refT * (refT + 10)) / 10, digits = 2), # Ea as eV
+         Ea_kJ.mol =  round((R) * log(Q10) * (refT * (refT + 10)) / 10), digits = 2) %>% # Ea as kJ/mol-1
   select(- c(k, R, df, refT, asymp.LCL, asymp.UCL)) %>%
   left_join(n_obs_excretion, by = "zoopGrp")
 excretionQ10
@@ -519,7 +528,7 @@ PlotLMM = function(model, data){
 # Plot it
 # Clearance
 clearPlot <- PlotLMM(m_clearance, d_clearance) + 
-  labs(y = expression(atop(bold("ln (Clearance rate)"),
+  labs(y = expression(atop(bold("ln (Clearance)"),
                            bold("(ml mgC"^-1*" h"^-1*")")))) +
   theme(legend.position = "none") +
   facet_wrap(~zoopGrp, nrow = 1)
@@ -528,7 +537,7 @@ clearPlot
 
 # Ingestion
 ingPlot <- PlotLMM(m_ingestion, d_ingestion) + 
-  labs(y = expression(atop(bold("ln (Ingestion rate)"),
+  labs(y = expression(atop(bold("ln (Ingestion)"),
                            bold("(mgC mgC"^-1*" h"^-1*")")))) +
   theme(legend.position = "none") +
   facet_wrap(~zoopGrp, nrow = 1)
@@ -537,7 +546,7 @@ ingPlot
 
 # Growth
 growPlot <- PlotLMM(m_growth, d_growth) + 
-  labs(y = expression(atop(bold("ln (Growth rate)"),
+  labs(y = expression(atop(bold("ln (Growth)"),
                            bold("(mgC mgC"^-1*" h"^-1*")")))) +
   theme(legend.position = "none") +
   facet_wrap(~zoopGrp, nrow = 2)
@@ -546,7 +555,7 @@ growPlot
 
 # Respiration
 respPlot <- PlotLMM(m_respiration, d_respiration) + 
-  labs(y = expression(atop(bold("ln (Respiration rate)"),
+  labs(y = expression(atop(bold("ln (Respiration)"),
                            bold("(" * mu * "lO"[2] * " mgC"^-1 * " h"^-1 * ")")))) +
   theme(legend.position = "none") +
   facet_wrap(~zoopGrp, nrow = 1)
@@ -555,7 +564,7 @@ respPlot
 
 # Excretion
 excrPlot <- PlotLMM(m_excretion, d_excretion) + 
-  labs(y = expression(atop(bold("ln (Excretion rate)"),
+  labs(y = expression(atop(bold("ln (Excretion)"),
                            bold('(mgN-NH'[4]^"+" * " mgC"^-1 * " h"^-1 * ")")))) +
   theme(legend.position = "none") +
   facet_wrap(~zoopGrp, nrow = 2)
@@ -596,7 +605,8 @@ clearQ10plot <- ggplot() +
     axis.title = element_text(size = 11, face = "bold"),
     axis.text = element_text(size = 10),
     axis.text.x = element_text(angle = 25, hjust = 1),
-    legend.position = "none")
+    legend.position = "none") +
+  coord_cartesian(ylim = c(0, 5.5))
 clearQ10plot
 
 
@@ -622,8 +632,20 @@ ingQ10plot <- ggplot() +
     axis.title = element_text(size = 11, face = "bold"),
     axis.text = element_text(size = 10),
     axis.text.x = element_text(angle = 25, hjust = 1),
-    legend.position = "none")
+    legend.position = "none") +
+  coord_cartesian(ylim = c(0, 5.5))
 ingQ10plot
+
+library(ggbreak) # to break y-axis on massive Q10 CI
+ingQ10plot_break <- ingQ10plot +
+  geom_text(data = filter(ingestionQ10, 
+                          (zoopGrp == "Copepods" & Q10_upr > 2) |
+                            (zoopGrp == "Euphausiids" & Q10_upr > 2)),
+            aes(x = zoopGrp, y = 5.5, label = paste0("↑ ", round(Q10_upr, 1))),
+            colour = "grey40", size = 4,
+            nudge_x = 0.3) +
+  coord_cartesian(ylim = c(0, 5.5))
+ingQ10plot_break
 
 
 # Growth
@@ -653,7 +675,6 @@ growQ10plot <- ggplot() +
   scale_x_discrete(expand = expansion(add = 0.8))  # adds 0.8 units of padding on each side
 growQ10plot
 
-library(ggbreak) # to break y-axis on massive Q10 CI
 growQ10plot_break <- growQ10plot +
   geom_text(data = filter(growthQ10, 
                           (zoopGrp == "Decapods" & Q10_upr > 2) |
@@ -662,7 +683,7 @@ growQ10plot_break <- growQ10plot +
             aes(x = zoopGrp, y = 5.5, label = paste0("↑ ", round(Q10_upr, 1))),
             colour = "grey40", size = 4,
             nudge_x = 0.3) +
-  coord_cartesian(ylim = c(0, 6))
+  coord_cartesian(ylim = c(0, 5.5))
 growQ10plot_break
 
 
@@ -699,7 +720,7 @@ respQ10plot_break <- respQ10plot +
             aes(x = zoopGrp, y = 5, label = paste0("↑ ", round(Q10_upr, 1))),
             colour = "grey40", size = 4,
             nudge_x = 0.3) +
-  coord_cartesian(ylim = c(0, 5))
+  coord_cartesian(ylim = c(0, 5.5))
 respQ10plot_break
 
 
@@ -741,35 +762,37 @@ excrQ10plot_break
 
 tempPlots
 # Combine with patchwork
-Q10Plots <- (clearQ10plot + ingQ10plot) / (growQ10plot_break + respQ10plot_break) + excrQ10plot_break
-  plot_layout(guides = "collect") & 
-  theme(legend.position = "none")
+Q10Plots <- (clearQ10plot + ingQ10plot_break) / (growQ10plot_break + respQ10plot_break) + excrQ10plot_break +
+  plot_layout(guides = "collect", 
+              axis_titles = "collect_x") & 
+  theme(legend.position = "none") 
+  
 Q10Plots
 # Nice to see them together but will add post hoc results on with post digitising
 
 # Can't save together properly so will do it separately
 clearQ10plot
-ingQ10plot
+ingQ10plot_break
 growQ10plot_break
 respQ10plot_break
 excrQ10plot_break
 
-# ggsave("Output/Figure5/Figure5_clearQ10.pdf", clearQ10plot, width = 90, height = 90, units = "mm", dpi = 300)
-# ggsave("Output/Figure5/Figure5_ingQ10.pdf", ingQ10plot, width = 90, height = 90, units = "mm", dpi = 300)
-# ggsave("Output/Figure5/Figure5_growQ10.pdf", growQ10plot_break, width = 90, height = 90, units = "mm", dpi = 300)
-# ggsave("Output/Figure5/Figure5_respQ10.pdf", respQ10plot_break, width = 90, height = 90, units = "mm", dpi = 300)
-# ggsave("Output/Figure5/Figure5_excrQ10.pdf", excrQ10plot_break, width = 90, height = 90, units = "mm", dpi = 300)
+ggsave("Output/Figure5/Figure5_clearQ10.pdf", clearQ10plot, width = 90, height = 90, units = "mm", dpi = 300)
+ggsave("Output/Figure5/Figure5_ingQ10.pdf", ingQ10plot_break, width = 90, height = 90, units = "mm", dpi = 300)
+ggsave("Output/Figure5/Figure5_growQ10.pdf", growQ10plot_break, width = 90, height = 90, units = "mm", dpi = 300)
+ggsave("Output/Figure5/Figure5_respQ10.pdf", respQ10plot_break, width = 90, height = 90, units = "mm", dpi = 300)
+ggsave("Output/Figure5/Figure5_excrQ10.pdf", excrQ10plot_break, width = 175, height = 90, units = "mm", dpi = 300)
 
 
-# Save the legend from this plot for post digitising
-legend <- growQ10plot_break + excrQ10plot_break +
-  plot_layout(guides = "collect") & theme(legend.position = "right")
-legend
-# ggsave("Output/Figure5/Figure5_legend.pdf", legend, width = 180, height = 180, units = "mm", dpi = 300)
+# # Save the legend from this plot for post digitising
+# legend <- growQ10plot_break + excrQ10plot_break +
+#   plot_layout(guides = "collect") & theme(legend.position = "right")
+# legend
+# # ggsave("Output/Figure5/Figure5_legend.pdf", legend, width = 180, height = 180, units = "mm", dpi = 300)
 
 
 # Save temperature plots
-# ggsave("Output/Figure5/FigureS1_tempPlot.pdf", tempPlots, width = 170, height = 180, units = "mm", dpi = 300)
-# ggsave("Output/Figure5/FigureS1_tempPlot.png", tempPlots, width = 170, height = 180, units = "mm", dpi = 300)
+ggsave("Output/Figure5/FigureS1_tempPlot.pdf", tempPlots, width = 170, height = 220, units = "mm", dpi = 300)
+ggsave("Output/Figure5/FigureS1_tempPlot.png", tempPlots, width = 170, height = 220, units = "mm", dpi = 300)
 
 
