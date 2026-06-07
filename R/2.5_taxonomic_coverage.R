@@ -27,6 +27,7 @@ growth <- readRDS("Data/grwth_dat.rds")
 respiration <- readRDS("Data/resp_dat.rds") 
 
 excretion <- readRDS("Data/excrete_dat.rds") %>% 
+  drop_na(Cspecific_rate) %>% 
   mutate(food_type = NA,
          food_conc = NA,
          method = NA) # Unknown values
@@ -77,7 +78,7 @@ tempDat_binded %>%
 # Data between 0 and 30 degC
 # A tibble: 1 × 3
 # n_total n_temp_range prop_temp_range
-#    3906         3585            91.8
+#    3905         3584            91.8
 
 
 
@@ -85,14 +86,14 @@ tempDat_binded %>%
 tempDat_binded %>% group_by(Dataset) %>% distinct(primRef) %>% count()
 # Dataset         n
 # 1 clearance      64
-# 2 excretion      27
+# 2 excretion      25
 # 3 growth         54
 # 4 ingestion      43
 # 5 respiration    20
 
 # What is the number of distinct records?
 tempDat_binded %>% distinct(primRef) %>% nrow()
-# 167
+# 165
 
 
 # What proportion of each dataset had the method report? ----
@@ -139,18 +140,18 @@ methodDat_binded %>%
          ) %>% 
   group_by(method) %>%
   summarise(n = n(), .groups = "drop") %>%
-  mutate(prop_method = round(n / sum(n) * 100, digit = 1)) %>% 
+  mutate(prop_method = round((n / sum(n)) * 100, digits = 2)) %>% 
   arrange(-prop_method)
 # Table S2 - Proportion of methods used for original data collection
 # method                    n         prop_method
-# 1 Not reported           3358        80.5
-# 2 Controlled experiment   760        18.2
-# 3 In situ experiment       56         1.3
+# 1 Not reported           3318        80.3
+# 2 Controlled experiment   760        18.4
+# 3 In situ experiment       56         1.4
 
 
 # How many total observations?
-3358 + 760 + 56
-  # 4174
+3318 + 760 + 56
+  # 4134
 
 
 # Table 1 ---
@@ -185,19 +186,19 @@ taxonomic_coverage_long <- taxonomic_coverage %>%
 
 taxonomic_coverage_long
 # Table S1
-# Groups        Clearance Ingestion Growth Respiration Excretion
+# Groups             Clearance Ingestion Growth Respiration Excretion
 # 1 Phyla                 5         3      5           4         5
 # 2 Classes               8         5      7           7         8
-# 3 Orders               12         7     15          15        16
-# 4 Families             27        16     27          39        49
-# 5 Genera               35        21     30          55        79
-# 6 Species              65        44     44         103       117
-# 7 Observations        618       307    488         978      1783
-# 8 Total records        64        43     54          20        27
+# 3 Orders               12         7     15          15        15
+# 4 Families             27        16     27          39        41
+# 5 Genera               35        21     30          55        71
+# 6 Species              65        44     44         103       110
+# 7 Observations        618       307    488         978      1743
+# 8 Total records        64        43     54          20        25
 
 # Total nobs
-618 + 307 + 488 + 978 + 1783
-  # 4174, perfect. matches previous count
+618 + 307 + 488 + 978 + 1743
+  # 4134, perfect. matches previous count
 
 # number of observations pre-cleaning were... 
 # Clearance   1580
@@ -219,8 +220,7 @@ allDat %>% # How many total unique groups/obs/records are there?
     totalGenera = n_distinct(genus),
     totalSpecies = n_distinct(species))
 #   totalPhylum totalClass totalOrder totalFamily totalGenera totalSpecies
-#       5          9         22          73         118          225
-
+#        5          9         22          65         110          216
 
 # Taxonomic composition by zoopGrp ----
 # Here we show the distribution of data across sizeGrps, funcGrps and zoopGrps for each rate process...

@@ -69,17 +69,17 @@ calcRatios <- function(params, groupVar = NULL) {
   
   # Build a dataframe with the ratios 
   data.frame(
-    ratio = c("G:I", # Gross (or ecological) growth efficiency - what is the proportion of ingested energy used for growth
-              # "G:G+R", # Net growth efficiency - what is the proportion of energy that is absorbed used ?
-              "R:I" # Metabolic expense - what is the proportion of ingested energy that is lost to metabolism?
+    ratio = c("G+R:I", # Assimilation efficiency - what is the proportion of ingested energy that is absorbed across the gut wall?
+              "G:I", # Gross (or ecological) growth efficiency - what is the proportion of ingested energy used for growth
+              "G:G+R" # Net growth efficiency - what is the proportion of energy that is absorbed used ?
     ),
-    value = c(round(G_mgC / I_mgC, digits = 2), # GGE = G:I
-              # round(G_mgC / (G_mgC + R_mgC), digits = 2), # NGE - assuming A ~= to G + R
-              round(R_mgC / I_mgC, digits = 2) # R:I
+    value = c(round(((G_mgC + R_mgC) / I_mgC) * 100, digits = 0), # AE -> assuming A ~= to G + R
+              round((G_mgC / I_mgC) * 100, digits = 0), # GGE = G:I
+              round((G_mgC / (G_mgC + R_mgC)) * 100, digits = 0) # NGE -> assuming A ~= to G + R
     ),
-    description = c("Gross growth efficiency",
-                    # "Net growth efficiency",
-                    "Metabolic expense"
+    description = c("AE (G+R:I)",
+                    "GGE (G:I)",
+                    "NGE (G:G+R)"
     ),
     referenceTemp = refT
     )
@@ -143,7 +143,7 @@ ratios_combined <- bind_rows(
   select(group, description, value) %>%
   pivot_wider(names_from = description, values_from = value) %>%
   left_join(n_taxa_all, by = "group") %>%
-  relocate(n_taxa, .after = group)
+  relocate(n_taxa, .after = everything())
 
 ratios_combined
 
