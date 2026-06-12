@@ -185,7 +185,7 @@ summary(m2)
 sizeGrp_slopes <- emtrends(m2, ~ rate_name * sizeGrp, var = "temp_C")
 summary(sizeGrp_slopes, infer = TRUE) %>% arrange(sizeGrp, rate_name) # test whether each slope is different from zero for each sizeGrp
 # yes, all different to zero
-emmeans::contrast(sizeGrp_slopes, by = "rate_name", method = "pairwise", adjustment = "none") # pairwise test whether slopes differ significantly across rate types and grps
+emmeans::contrast(sizeGrp_slopes, by = "rate_name", method = "pairwise", adjust = "none") # pairwise test whether slopes differ significantly across rate types and grps
   # yes, clearance: meso-macro
 
 

@@ -192,7 +192,7 @@ summary(funcGrp_slopes, infer = TRUE) %>% arrange(funcGrp, rate_name) # test whe
   # GelFilter, ingestion
   # GelFilter, growth
   # GelFilter, respiration
-emmeans::contrast(funcGrp_slopes, by = "rate_name", method = "pairwise", adjustment = "mvt") # pairwise test whether slopes differ significantly across rate types and grps
+emmeans::contrast(funcGrp_slopes, by = "rate_name", method = "pairwise", adjust = "mvt") # pairwise test whether slopes differ significantly across rate types and grps
 # Only sig differences for:
   # crustaceans - gelPreds, clearance
   # crustaceans - gelPreds, growth
