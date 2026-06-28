@@ -199,6 +199,12 @@ d_excretion <- m2$data[m2$rate_name == "Excretion"][[1]]
 # Clearance
 sim <- simulateResiduals(m_clearance)
 plot(sim) # doesn't look great
+# Plot without tests
+par(mfrow = c(1, 2))
+plotQQunif(sim, testUniformity = FALSE, testOutliers = FALSE, testDispersion = FALSE)
+plotResiduals(sim)
+par(mfrow = c(1, 1)) # Reset back to normal
+
 # we'll accept this as a limitation instead of over fitting this data
 summary(m_clearance)
 
@@ -206,24 +212,45 @@ summary(m_clearance)
 # Ingestion
 sim <- simulateResiduals(m_ingestion)
 plot(sim) # basically have the same issue here with ingestion, though QQ looks better
+# Plot without tests
+par(mfrow = c(1, 2))
+plotQQunif(sim, testUniformity = FALSE, testOutliers = FALSE, testDispersion = FALSE)
+plotResiduals(sim)
+par(mfrow = c(1, 1)) # Reset back to normal
 summary(m_ingestion)
 
 
 # Growth
 sim <- simulateResiduals(m_growth)
 plot(sim) # looks fine
+# Plot without tests
+par(mfrow = c(1, 2))
+plotQQunif(sim, testUniformity = FALSE, testOutliers = FALSE, testDispersion = FALSE)
+plotResiduals(sim)
+par(mfrow = c(1, 1)) # Reset back to normal
+
 summary(m_growth)
 
 
 # Respiration
 sim <- simulateResiduals(m_respiration)
 plot(sim) # looks pretty good overall
+# Plot without tests
+par(mfrow = c(1, 2))
+plotQQunif(sim, testUniformity = FALSE, testOutliers = FALSE, testDispersion = FALSE)
+plotResiduals(sim)
+par(mfrow = c(1, 1)) # Reset back to normal
 summary(m_respiration)
 
 
 # Excretion
 sim <- simulateResiduals(m_excretion)
 plot(sim) # looks pretty good overall
+# Plot without tests
+par(mfrow = c(1, 2))
+plotQQunif(sim, testUniformity = FALSE, testOutliers = FALSE, testDispersion = FALSE)
+plotResiduals(sim)
+par(mfrow = c(1, 1)) # Reset back to normal
 summary(m_excretion)
 
 

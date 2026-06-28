@@ -144,7 +144,16 @@ m2 <- glmmTMB(ln_Cspecific_rate ~
   # Check diagnostics
   sim <- simulateResiduals(m2)
   plot(sim) # Looks fine, could be a couple of outliers based on the residuals plot...it is probably the appendicularians in the excretion dataset
+  # Plot without tests
+  par(mfrow = c(1, 2))
+  plotQQunif(sim, testUniformity = FALSE, testOutliers = FALSE, testDispersion = FALSE)
+  plotResiduals(sim)
+  par(mfrow = c(1, 1)) # Reset back to normal
+  
   summary(m2)
+  
+
+  
 
   
 # Fit a simpler model without the 3-way interactions, just 2-way interactions, same random effect structure

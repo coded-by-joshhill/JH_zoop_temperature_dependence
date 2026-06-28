@@ -154,6 +154,11 @@ m2 <- glmmTMB(ln_Cspecific_rate ~
   # Check diagnostics
   sim <- simulateResiduals(m2)
   plot(sim) # Looks fine, bit of deviation on the QQ plot since including excretion
+  par(mfrow = c(1, 2))
+  plotQQunif(sim, testUniformity = FALSE, testOutliers = FALSE, testDispersion = FALSE)
+  plotResiduals(sim)
+  par(mfrow = c(1, 1)) # Reset back to normal
+  
   summary(m2)
   # this looks good...
   # but we will swap the random intercepts over and check the models anyway

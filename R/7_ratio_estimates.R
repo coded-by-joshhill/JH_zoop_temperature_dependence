@@ -22,11 +22,11 @@ zoopGrp_excretion_params <- readRDS(file = "Data/modelParameters/ZGrpExcretionEs
 
 # Combine the zoopGrp params into one object
 zoopGrp_params <- bind_rows(
-  readRDS("Data/modelParameters/ZGrpClearanceEstimates.rds")   %>% mutate(rate_name = "Clearance"),
-  readRDS("Data/modelParameters/ZGrpIngestionEstimates.rds")   %>% mutate(rate_name = "Ingestion"),
-  readRDS("Data/modelParameters/ZGrpGrowthEstimates.rds")      %>% mutate(rate_name = "Growth"),
+  readRDS("Data/modelParameters/ZGrpClearanceEstimates.rds") %>% mutate(rate_name = "Clearance"),
+  readRDS("Data/modelParameters/ZGrpIngestionEstimates.rds") %>% mutate(rate_name = "Ingestion"),
+  readRDS("Data/modelParameters/ZGrpGrowthEstimates.rds") %>% mutate(rate_name = "Growth"),
   readRDS("Data/modelParameters/ZGrpRespirationEstimates.rds") %>% mutate(rate_name = "Respiration"),
-  readRDS("Data/modelParameters/ZGrpExcretionEstimates.rds")   %>% mutate(rate_name = "Excretion"))
+  readRDS("Data/modelParameters/ZGrpExcretionEstimates.rds") %>% mutate(rate_name = "Excretion"))
 
 # Read in the mdat objects (we'll use these to get the number of taxa the efficienices represent)
 allZ_mdat <- readRDS(file = "Data/modelParameters/allZoop_mdat.rds")
