@@ -297,8 +297,8 @@ SgrpFreqPlot <- ggplot(all_Sgroups,
   scale_fill_manual(values = mycols) +
   scale_y_log10(expand = expansion(mult = c(0, 0.10))) +
   coord_flip() +
-  labs(x = expression(bold("Zooplankton size")),
-       y = expression(bold("Number of observations (log10)")),
+  labs(x = expression(bold("Size group")),
+       y = expression(bold("Number of observations")),
        fill = "Dataset") +
   theme_bw(base_size = 12) +
   theme(legend.position = "top",
@@ -401,7 +401,7 @@ FgrpFreqPlot <- ggplot(all_Fgroups,
   coord_flip() +
   labs(
     x = expression(bold("Functional group")),
-    y = expression(bold("Number of observations (log10)")),
+    y = expression(bold("Number of observations")),
     fill = "Dataset") +
   theme_bw(base_size = 12) +
   theme(
@@ -499,8 +499,8 @@ ZgrpFreqPlot <- ggplot(all_Zgroups,
   scale_y_log10(expand = expansion(mult = c(0, 0.2))) +
   coord_flip() +
   labs(
-    x = expression(bold("Zooplankton group")),
-    y = expression(bold("Number of observations (log10)")),
+    x = expression(bold("Taxonomic group")),
+    y = expression(bold("Number of observations")),
     fill = "Dataset") +
   theme_bw(base_size = 12) +
   theme(
