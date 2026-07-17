@@ -299,7 +299,7 @@ SgrpFreqPlot <- ggplot(all_Sgroups,
   coord_flip() +
   labs(x = expression(bold("Size group")),
        y = expression(bold("Number of observations")),
-       fill = "Dataset") +
+       fill = "Rate process") +
   theme_bw(base_size = 12) +
   theme(legend.position = "top",
         legend.title = element_text(size = 12, face = "bold"),
@@ -402,7 +402,7 @@ FgrpFreqPlot <- ggplot(all_Fgroups,
   labs(
     x = expression(bold("Functional group")),
     y = expression(bold("Number of observations")),
-    fill = "Dataset") +
+    fill = "Rate process") +
   theme_bw(base_size = 12) +
   theme(
     legend.position = "top",
@@ -501,7 +501,7 @@ ZgrpFreqPlot <- ggplot(all_Zgroups,
   labs(
     x = expression(bold("Taxonomic group")),
     y = expression(bold("Number of observations")),
-    fill = "Dataset") +
+    fill = "Rate process") +
   theme_bw(base_size = 12) +
   theme(
     legend.position = "top",
