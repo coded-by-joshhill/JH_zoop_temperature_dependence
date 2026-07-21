@@ -354,8 +354,6 @@ sizeGQ10plot <- ggplot() +
     legend.position = "top")
 sizeGQ10plot
 
-
-
 tempPlot+sizeGQ10plot
 
 # Save it
