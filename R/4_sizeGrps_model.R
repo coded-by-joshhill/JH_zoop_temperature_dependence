@@ -152,9 +152,6 @@ m2 <- glmmTMB(ln_Cspecific_rate ~
   
   summary(m2)
   
-
-  
-
   
 # Fit a simpler model without the 3-way interactions, just 2-way interactions, same random effect structure
 m3 <- glmmTMB(ln_Cspecific_rate ~ 
@@ -233,7 +230,7 @@ sizeGrp_slopes_Q10 <- as.data.frame(sizeGrp_slopes) %>%
          k = 8.617e-5, # Boltzmann's constant as eV/K-1
          R = 8.314 / 1000, # Ideal gas constant as kJ mol-1
          Ea_eV = round(k * log(Q10) * (refT * (refT + 10)) / 10, digits = 2), # Ea as eV
-         Ea_kJ.mol =  round((R) * log(Q10) * (refT * (refT + 10)) / 10) # Ea as kJ/mol-1
+         Ea_kJ.mol = round((R) * log(Q10) * (refT * (refT + 10)) / 10) # Ea as kJ/mol-1
          ) %>%
   select(- c(k, R, df, refT, asymp.LCL, asymp.UCL)) %>%
   left_join(n_obs, by = c("rate_name", "sizeGrp")) %>% 
@@ -270,7 +267,7 @@ PlotLMM = function(model){
                   type = "response",
                   re.form = NA)
   pop_preds$estimate <- pred$fit
-  pop_preds$conf.low  <- pred$fit - 1.96 * pred$se.fit
+  pop_preds$conf.low <- pred$fit - 1.96 * pred$se.fit
   pop_preds$conf.high <- pred$fit + 1.96 * pred$se.fit
   
 
@@ -303,7 +300,6 @@ PlotLMM = function(model){
          y = "ln(Carbon-mass specific rate)",
          fill = "Size group",
          colour = "Size group") +
-    theme_bw() +
     theme(
       strip.background = element_rect(fill = "whitesmoke", colour = "black"),
       axis.title = element_text(size = 11, face = "bold"),

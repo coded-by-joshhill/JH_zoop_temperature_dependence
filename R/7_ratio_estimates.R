@@ -147,3 +147,96 @@ ratios_combined <- bind_rows(
 
 ratios_combined
 
+
+# Efficiency Q10s ----
+  # Temperature sensitivity of each efficiency.
+  # Every efficiency is a ratio of rates, so its slope is a combination of the underlying rate slopes:
+    # GGE = G/I -> bGGE = bG - bI
+    # NGE = G/(G+R) -> bNGE = (1 - w) * (bG - bR)
+    # AE = (G+R)/I -> bAE  = w*bG + (1 - w)*bR - bI
+  # where w = G/(G+R) is the growth share of assimilation (i.e. NGE as a proportion), evaluated at the reference temp
+  # Q10 = exp(10 * slope_of_efficiency)
+
+calcEfficiencyQ10 <- function(params, groupVar = NULL) {
+  refT   <- 15    # same reference temp as our calculated ratios
+  RQ     <- 0.8
+  RQconv <- RQ * (12.011 / 22.4) * (1 / 1000)
+  
+  calcSingleQ10 <- function(df, grpLabel = NULL) {
+    G <- df %>% filter(rate_name == "Growth")
+    R <- df %>% filter(rate_name == "Respiration")
+    I <- df %>% filter(rate_name == "Ingestion")
+    
+    if (nrow(G) == 0 | nrow(R) == 0 | nrow(I) == 0) {
+      warning(paste("NO RATES FOR GROUPING VARIABLE:", grpLabel))
+      return(data.frame())
+    }
+    
+    # Slopes straight from the models (log-rate vs temperature).
+    # The RQ conversion is a constant multiplier, so it does NOT
+    # change R's slope - only its intercept - hence bR is used as-is.
+    bG <- G$slope
+    bR <- R$slope
+    bI <- I$slope
+    
+    # Growth share of assimilation (the weight, = NGE as a proportion).
+    # Computed from back-transformed carbon values at refT, exactly
+    # as in calcRatios(), so R must be converted to carbon first.
+    G_mgC <- exp((G$slope * refT) + G$intercept)
+    R_mgC <- exp((R$slope * refT) + R$intercept) * RQconv
+    w <- G_mgC / (G_mgC + R_mgC)
+    
+    # Efficiency slopes
+    bGGE <- bG - bI
+    bNGE <- (1 - w) * (bG - bR)
+    bAE  <- w * bG + (1 - w) * bR - bI
+    
+    data.frame(
+      ratio = c("G+R:I", "G:I", "G:G+R"),
+      Q10 = c(round(exp(10 * bAE),  digits = 2),
+              round(exp(10 * bGGE), digits = 2),
+              round(exp(10 * bNGE), digits = 2)),
+      description = c("AE (G+R:I)", "GGE (G:I)", "NGE (G:G+R)"),
+      weight_NGE = round(w, digits = 3),
+      referenceTemp = refT
+    )
+  }
+  
+  if (is.null(groupVar)) {
+    return(calcSingleQ10(params))
+  }
+  
+  params %>%
+    group_by(across(all_of(groupVar))) %>%
+    group_modify(~ calcSingleQ10(.x, grpLabel = as.character(.y[[groupVar]]))) %>%
+    ungroup()
+}
+
+
+# Estimate efficiency Q10s ----
+q10_allZ <- calcEfficiencyQ10(allZ_params)
+q10_allZ
+
+q10_sizeGrp <- calcEfficiencyQ10(sizeGrp_params, groupVar = "sizeGrp")
+q10_sizeGrp
+
+q10_funcGrp <- calcEfficiencyQ10(funcGrp_params, groupVar = "funcGrp")
+q10_funcGrp
+
+q10_zoopGrp <- calcEfficiencyQ10(zoopGrp_params, groupVar = "zoopGrp")
+q10_zoopGrp
+
+
+# Combine into a wide table (mirrors ratios_combined) ----
+q10_combined <- bind_rows(
+  q10_allZ %>% mutate(level = "All zooplankton", group = "All zooplankton"),
+  q10_sizeGrp %>% rename(group = sizeGrp) %>% mutate(level = "Size group"),
+  q10_funcGrp %>% rename(group = funcGrp) %>% mutate(level = "Functional group"),
+  q10_zoopGrp %>% rename(group = zoopGrp) %>% mutate(level = "Zooplankton group")) %>%
+  select(group, description, Q10) %>%
+  pivot_wider(names_from = description, values_from = Q10) %>%
+  left_join(n_taxa_all, by = "group") %>%
+  relocate(n_taxa, .after = everything())
+
+q10_combined
+

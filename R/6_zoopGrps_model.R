@@ -540,7 +540,6 @@ PlotLMM = function(model, data){
     scale_fill_manual(values = grp_cols) +
     scale_colour_manual(values = grp_cols) +
     scale_x_continuous(breaks = c(0, 15, 30)) +
-    theme_bw() +
     theme(
       strip.background = element_rect(fill = "whitesmoke", colour = "black"),
       strip.text = element_text(face = "bold"),

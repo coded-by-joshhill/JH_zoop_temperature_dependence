@@ -310,7 +310,6 @@ PlotLMM = function(model){
          y = "ln(Carbon-mass specific rate)",
          fill = "Functional group",
          colour = "Functional group") +
-    theme_bw() +
     theme(
       strip.background = element_rect(fill = "whitesmoke", colour = "black"),
       axis.title = element_text(size = 11, face = "bold"),

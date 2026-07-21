@@ -238,7 +238,7 @@ slopes_Q10 <- as.data.frame(slopes) %>%
          k = 8.617e-5, # Boltzmann's constant as eV/K-1
          R = 8.314 / 1000, # Ideal gas constant as kJ mol-1
          Ea_eV = k * log(Q10) * (refT * (refT + 10)) / 10, # Ea as eV
-         Ea_kJ.mol =  (R) * log(Q10) * (refT * (refT + 10)) / 10 # Ea as kJ/mol-1
+         Ea_kJ.mol = (R) * log(Q10) * (refT * (refT + 10)) / 10 # Ea as kJ/mol-1
          ) %>%
   select(- c(k, R, df, refT, asymp.LCL, asymp.UCL)) %>% 
   left_join(n_obs, by = "rate_name")
@@ -259,7 +259,7 @@ PlotLMM = function(model){
   
   # Build newdata grid manually
   newdat <- expand.grid(
-    temp_C    = temp_seq,
+    temp_C = temp_seq,
     rate_name = unique(mdat$rate_name)) # levels of rates
 
 
@@ -269,7 +269,7 @@ PlotLMM = function(model){
                   type = "response",
                   re.form = NA)
   pop_preds$estimate <- pred$fit
-  pop_preds$conf.low  <- pred$fit - 1.96 * pred$se.fit
+  pop_preds$conf.low <- pred$fit - 1.96 * pred$se.fit
   pop_preds$conf.high <- pred$fit + 1.96 * pred$se.fit
   
 
@@ -291,12 +291,11 @@ PlotLMM = function(model){
                  "Growth"      = "bold(Growth~(mgC~mgC^-1~h^-1))",
                  "Respiration" = "bold(Respiration~(µlO[2]~mgC^-1~h^-1))",
                  "Excretion"   = "bold(Excretion~('mgN-NH'[4]^'+'~mgC^-1~h^-1))"
-               ), 
-               label_parsed), ncol = 1)+ 
+                 ), 
+                 label_parsed), ncol = 1)+ 
     coord_cartesian(xlim = c(-2, 32)) +
     labs(x = "Temp (°C)",
          y = "ln (Carbon-mass specific rate)") +
-    theme_bw() +
     theme(
       strip.background = element_rect(fill = "whitesmoke", colour = "black"),
       axis.title = element_text(size = 11, face = "bold"),
@@ -342,7 +341,7 @@ allZoopQ10plot <- ggplot() +
 allZoopQ10plot
 
 
-fig2 <- tempPlot+allZoopQ10plot +
+fig2 <- tempPlot + allZoopQ10plot +
   plot_layout(guides = "collect")
 fig2
 
