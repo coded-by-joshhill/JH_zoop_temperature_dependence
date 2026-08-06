@@ -304,8 +304,8 @@ PlotLMM = function(model){
                label_parsed),
                ncol = 1)+ 
     coord_cartesian(xlim = c(-2, 32)) +
-    scale_fill_manual(values = grp_cols, labels = c("Crustaceans" , "Gelatinious predators", "Gelatinious filter-feeders")) +
-    scale_colour_manual(values = grp_cols, labels = c("Crustaceans" , "Gelatinious predators", "Gelatinious filter-feeders")) +
+    scale_fill_manual(values = grp_cols, labels = c("Crustaceans" , "Gelatinous predators", "Gelatinous filter-feeders")) +
+    scale_colour_manual(values = grp_cols, labels = c("Crustaceans" , "Gelatinous predators", "Gelatinous filter-feeders")) +
     labs(x = "Temp (°C)",
          y = "ln(Carbon-mass specific rate)",
          fill = "Functional group",
@@ -381,6 +381,6 @@ funcG10plot_break
 tempPlot + funcG10plot_break
 
 # Save it
-ggsave("Output/Figure4/Figure4_tempPlot.pdf", tempPlot, width = 75, height = 220, units = "mm", dpi = 300)
-ggsave("Output/Figure4/Figure4_Q10Plot.pdf", funcG10plot_break, width = 75, height = 220, units = "mm", dpi = 300)
+ggsave("Output/Figure4/Figure4_tempPlot.pdf", tempPlot, width = 75, height = 240, units = "mm", dpi = 300)
+ggsave("Output/Figure4/Figure4_Q10Plot.pdf", funcG10plot_break, width = 75, height = 240, units = "mm", dpi = 300)
 

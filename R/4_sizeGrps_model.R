@@ -347,6 +347,7 @@ sizeGQ10plot <- ggplot() +
        y = bquote(bold("Carbon-mass specific Q"[10])),
        colour = "Size group") +
   scale_x_discrete(labels = c("Mesozooplankton", "Macrozooplankton")) +
+  coord_cartesian(ylim = c(-1, 8)) +
   theme(
     strip.background = element_rect(fill = "whitesmoke", colour = "black"),
     axis.title = element_text(size = 11, face = "bold"),
@@ -357,6 +358,6 @@ sizeGQ10plot
 tempPlot+sizeGQ10plot
 
 # Save it
-ggsave("Output/Figure3/Figure3_tempPlot.pdf", tempPlot, width = 75, height = 220, units = "mm", dpi = 300)
-ggsave("Output/Figure3/Figure3_Q10Plot.pdf", sizeGQ10plot, width = 75, height = 220, units = "mm", dpi = 300)
+ggsave("Output/Figure3/Figure3_tempPlot.pdf", tempPlot, width = 75, height = 240, units = "mm", dpi = 300)
+ggsave("Output/Figure3/Figure3_Q10Plot.pdf", sizeGQ10plot, width = 75, height = 240, units = "mm", dpi = 300)
 

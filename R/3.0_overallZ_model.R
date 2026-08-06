@@ -318,7 +318,7 @@ allZoopQ10plot <- ggplot() +
   geom_errorbar(data = slopes_Q10, 
                 aes(x = rate_name, ymin = Q10_lwr, ymax = Q10_upr), 
                 colour = "grey",
-                width = 0.2, linewidth = 1) +
+                width = 0.1, linewidth = 1) +
   geom_point(data = slopes_Q10, 
              aes(x = rate_name, y = Q10),
              size = 4, colour = "midnightblue") +
@@ -347,5 +347,5 @@ fig2
 
 
 # Save the plots ----
-ggsave("Output/Figure2/Figure2_tempPlot.pdf", tempPlot, width = 70, height = 180, units = "mm", dpi = 300)
-ggsave("Output/Figure2/Figure2_Q10Plot.pdf", allZoopQ10plot, width = 80, height = 180, units = "mm", dpi = 300)
+ggsave("Output/Figure2/Figure2_tempPlot.pdf", tempPlot, width = 70, height = 200, units = "mm", dpi = 300)
+ggsave("Output/Figure2/Figure2_Q10Plot.pdf", allZoopQ10plot, width = 80, height = 80, units = "mm", dpi = 300)

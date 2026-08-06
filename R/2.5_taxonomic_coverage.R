@@ -53,7 +53,7 @@ mycols <- c("Clearance" = "#66c2a5", "Ingestion" = "#fc8d62", "Growth" = "#8da0c
 # Quick function to select data across each dataset
 temp_dat_summary <- function(data, dataset_name) {
   data %>%
-    select(temp_C, Cspecific_rate, primRef) %>%
+    select(temp_C, Cspecific_rate, primRef, primRef_URL) %>%
     mutate(Dataset = dataset_name)
 }
 
@@ -92,9 +92,59 @@ tempDat_binded %>% group_by(Dataset) %>% distinct(primRef) %>% count()
 # 5 respiration    20
 
 # What is the number of distinct records?
-tempDat_binded %>% distinct(primRef) %>% nrow()
-# 165
+tempDat_binded %>% 
+  mutate(primRef = case_when(primRef == "Bimstedt1985" ~ "Bamstedt1985", # Fix this spelling
+                             .default = primRef)) %>%
+  distinct(primRef, primRef_URL) %>% 
+  arrange(primRef) %>%
+  drop_na(primRef) %>% 
+  select(-primRef_URL) %>% 
+  print(n = Inf) # 172
 
+primRef_table <- tempDat_binded %>% 
+  drop_na(primRef) %>% # drop any NAs
+  mutate(primRef = case_when(primRef == "Bimstedt1985" ~ "Bamstedt1985", # Fix this spelling
+                             .default = primRef)) %>% 
+  distinct(Dataset, primRef, primRef_URL) %>% 
+  arrange(Dataset, primRef) %>% 
+  group_by(Dataset) %>% 
+  mutate(No = row_number()) %>%   # numbering within each dataset
+  ungroup() %>% 
+  select(No, primRef, Dataset, -primRef_URL) %>% 
+  pivot_wider(names_from = Dataset, values_from = primRef) %>% 
+  relocate(excretion, .after = respiration) %>% 
+  relocate(growth, .after = ingestion)
+primRef_table
+
+# A function that cleans old suffix and applies tidy ones ----
+cleanSuffix <- function(x) {
+  # Strip any existing suffix that follows a 4 digit year
+  base <- str_remove(x, "(?<=[0-9]{4})[a-z]$")
+  
+  # Count occurrences of each base value
+  dup_counts <- table(base[!is.na(base)]) # build frequency table of the stripped base primRefs
+  out <- base # copy the base primRefs
+  counter <- list() # create a counter list to track iterations for new suffix
+  
+  # A for loop to map the stripping of old suffix and adding of new suffix across each dataset/column
+  for (i in seq_along(base)) {
+    b <- base[i] # Take base primRef
+    if (is.na(b)) next # skip if NA
+    if (dup_counts[[b]] > 1) { # if the base primRef occurs more than once...
+      counter[[b]] <- (counter[[b]] %||% 0) + 1 # increase counter by 1 and...
+      out[i] <- paste0(b, letters[counter[[b]]]) # paste a suffix to the end of the base primRef
+    } # end if statement
+  } # end the loop
+  out # give me the final output
+} # END OF SUFFIXCLEANER
+
+# Clean primRef table and deal with old suffix from databases
+primRef_table_clean <- primRef_table %>% # make a clean table with the existing one...
+  mutate(across(-No, cleanSuffix)) # map across each column and apply the suffix cleaner
+primRef_table_clean
+
+# Save it as a csv
+write_csv(primRef_table_clean, "Output/primRef_table.csv")
 
 # What proportion of each dataset had the method report? ----
 # Quick function to select data across each dataset
