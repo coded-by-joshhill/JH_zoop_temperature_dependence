@@ -28,14 +28,12 @@ theme_set(new = theme_bw())
 # Feeding data
 dat <- readRDS("Data/clear_ingest_data.rds")
 
-
 # Clearance data
 cleardat <- dat %>% 
   filter(rate_name == "ClearanceRate") %>% # Filter for clearance rate
   select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Clearance"))
-
 
 # Ingestion data
 ingdat <- dat %>% 
@@ -44,13 +42,11 @@ ingdat <- dat %>%
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Ingestion"))
 
-
 # Growth data
 grwdat <- readRDS("Data/grwth_dat.rds") %>% 
   select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Growth"))
-
 
 # Respiration data
 respdat <- readRDS("Data/resp_dat.rds") %>% 
@@ -58,13 +54,11 @@ respdat <- readRDS("Data/resp_dat.rds") %>%
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Respiration"))
 
-
 # Excretion data
 excredat <- readRDS("Data/excrete_dat.rds") %>% 
   select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Excretion"))
-
 
 # Combine them into one...
 usedat <- rbind(cleardat, ingdat, grwdat, respdat, excredat)
@@ -107,7 +101,7 @@ mdat <- usedat %>%
   mutate(ln_Cspecific_rate = log(Cspecific_rate)) # log transform mass-specific rate and save as new variable
 
 # Save mdat so we can estimate number of taxa for ratios later...
-# saveRDS(mdat, file = "Data/modelParameters/allZoop_mdat.rds")
+saveRDS(mdat, file = "Data/modelParameters/allZoop_mdat.rds")
 
 # Quick look
 mdat %>% 
@@ -121,13 +115,11 @@ mdat %>%
   # growth is mgC/mgC/hr
   # respiration is uLO2/mgC/hr
   # excretion is mgN-NH4+/mgC/hr
-
 summary(mdat)
 
 
- # My main question here is...
+# My main question here is...
   # How does temperature dependence vary across each rate for zooplankton in general?
-
 
 # Fit the models ----
 
@@ -136,7 +128,7 @@ m1 <- glmmTMB(ln_Cspecific_rate ~
                 temp_C * rate_name + # interactions between temp and different rates across all zooplankton
                 (temp_C | primRef) + (temp_C | taxa), # with primRef and taxa as random intercepts and slopes
               data = mdat) 
-  # model doesn't converge...probably due to random effects because before including excretion, it converged fine...
+  # model doesn't converge...probably due to random effects...
 
   # Check diagnostics
   diagnose(m1) # I suspect the model does not converge well due to the random effects structure
@@ -310,9 +302,7 @@ tempPlot <- PlotLMM(m2)
 tempPlot
 
 
-# Generate Q10s for zooplankton in general ----
-
-
+# Generate Q10s for zooplankton overall ----
 # Plot allZoop Q10s
 allZoopQ10plot <- ggplot() +
   geom_errorbar(data = slopes_Q10, 
@@ -337,15 +327,10 @@ allZoopQ10plot <- ggplot() +
     axis.text = element_text(size = 10),
     axis.text.x = element_text(angle = 25, hjust = 1)
   )
-
 allZoopQ10plot
 
 
-fig2 <- tempPlot + allZoopQ10plot +
-  plot_layout(guides = "collect")
-fig2
-
 
 # Save the plots ----
-ggsave("Output/Figure2/Figure2_tempPlot.pdf", tempPlot, width = 70, height = 200, units = "mm", dpi = 300)
-ggsave("Output/Figure2/Figure2_Q10Plot.pdf", allZoopQ10plot, width = 80, height = 80, units = "mm", dpi = 300)
+ggsave("Output/Figure2_raw/Figure2_tempPlot.pdf", tempPlot, width = 70, height = 200, units = "mm", dpi = 300)
+ggsave("Output/Figure2_raw/Figure2_Q10Plot.pdf", allZoopQ10plot, width = 80, height = 80, units = "mm", dpi = 300)

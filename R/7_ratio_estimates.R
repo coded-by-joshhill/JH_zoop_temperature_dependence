@@ -116,7 +116,7 @@ n_taxa_all <- bind_rows(
   allZ_mdat %>%
     filter(rate_name %in% c("Growth", "Respiration", "Ingestion")) %>%
     summarise(n_taxa = n_distinct(taxa)) %>%
-    mutate(group = "All zooplankton"),
+    mutate(group = "Zooplankton overall"),
   sizeGrp_mdat %>%
     filter(rate_name %in% c("Growth", "Respiration", "Ingestion")) %>%
     group_by(sizeGrp) %>%
@@ -131,12 +131,11 @@ n_taxa_all <- bind_rows(
     filter(rate_name %in% c("Growth", "Respiration", "Ingestion")) %>%
     group_by(zoopGrp) %>%
     summarise(n_taxa = n_distinct(taxa), .groups = "drop") %>%
-    rename(group = zoopGrp)
-)
+    rename(group = zoopGrp))
 
 # Combine them together 
 ratios_combined <- bind_rows(
-  ratios_allZ    %>% mutate(level = "All zooplankton", group = "All zooplankton"),
+  ratios_allZ    %>% mutate(level = "Zooplankton overall", group = "Zooplankton overall"),
   ratios_sizeGrp %>% rename(group = sizeGrp) %>% mutate(level = "Size group"),
   ratios_funcGrp %>% rename(group = funcGrp) %>% mutate(level = "Functional group"),
   ratios_zoopGrp %>% rename(group = zoopGrp) %>% mutate(level = "Zooplankton group")) %>%
@@ -144,7 +143,6 @@ ratios_combined <- bind_rows(
   pivot_wider(names_from = description, values_from = value) %>%
   left_join(n_taxa_all, by = "group") %>%
   relocate(n_taxa, .after = everything())
-
 ratios_combined
 
 
@@ -229,7 +227,7 @@ q10_zoopGrp
 
 # Combine into a wide table (mirrors ratios_combined) ----
 q10_combined <- bind_rows(
-  q10_allZ %>% mutate(level = "All zooplankton", group = "All zooplankton"),
+  q10_allZ %>% mutate(level = "Zooplankton overall", group = "Zooplankton overall"),
   q10_sizeGrp %>% rename(group = sizeGrp) %>% mutate(level = "Size group"),
   q10_funcGrp %>% rename(group = funcGrp) %>% mutate(level = "Functional group"),
   q10_zoopGrp %>% rename(group = zoopGrp) %>% mutate(level = "Zooplankton group")) %>%
@@ -237,6 +235,4 @@ q10_combined <- bind_rows(
   pivot_wider(names_from = description, values_from = Q10) %>%
   left_join(n_taxa_all, by = "group") %>%
   relocate(n_taxa, .after = everything())
-
 q10_combined
-

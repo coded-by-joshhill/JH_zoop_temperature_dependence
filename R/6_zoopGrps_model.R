@@ -17,6 +17,7 @@ library(glmmTMB) # for modelling
 library(DHARMa) # for diagnostics
 library(emmeans) # Estimated marginal means
 library(performance)
+library(ggbreak) # to break y-axis on massive Q10 CI
 library(patchwork)
 theme_set(new = theme_bw())
 
@@ -27,14 +28,12 @@ theme_set(new = theme_bw())
 # Feeding data
 dat <- readRDS("Data/clear_ingest_data.rds")
 
-
 # Clearance data
 cleardat <- dat %>% 
   filter(rate_name == "ClearanceRate") %>% # Filter for clearance rate
   select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Clearance"))
-
 
 # Ingestion data
 ingdat <- dat %>% 
@@ -43,13 +42,11 @@ ingdat <- dat %>%
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Ingestion"))
 
-
 # Growth data
 grwdat <- readRDS("Data/grwth_dat.rds") %>% 
   select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Growth"))
-
 
 # Respiration data
 respdat <- readRDS("Data/resp_dat.rds") %>% 
@@ -63,7 +60,6 @@ excredat <- readRDS("Data/excrete_dat.rds") %>%
   select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Excretion"))
-
 
 # Custom grouping order
 group_order <- c("Ctenophores",
@@ -114,7 +110,7 @@ mdat <- usedat %>%
   mutate(ln_Cspecific_rate = log(Cspecific_rate)) # log transform mass-specific rate
 
 # Save mdat so we can estimate number of taxa for ratios later...
-# saveRDS(mdat, file = "Data/modelParameters/zoopGrp_mdat.rds")
+saveRDS(mdat, file = "Data/modelParameters/zoopGrp_mdat.rds")
 
 
 # Quick look
@@ -662,7 +658,7 @@ ingQ10plot <- ggplot() +
   coord_cartesian(ylim = c(0, 5.5))
 ingQ10plot
 
-library(ggbreak) # to break y-axis on massive Q10 CI
+# Break y
 ingQ10plot_break <- ingQ10plot +
   geom_text(data = filter(ingestionQ10, 
                           (zoopGrp == "Copepods" & Q10_upr > 2) |
@@ -803,22 +799,13 @@ growQ10plot_break
 respQ10plot_break
 excrQ10plot_break
 
-ggsave("Output/Figure5/Figure5_clearQ10.pdf", clearQ10plot, width = 90, height = 90, units = "mm", dpi = 300)
-ggsave("Output/Figure5/Figure5_ingQ10.pdf", ingQ10plot_break, width = 90, height = 90, units = "mm", dpi = 300)
-ggsave("Output/Figure5/Figure5_growQ10.pdf", growQ10plot_break, width = 90, height = 90, units = "mm", dpi = 300)
-ggsave("Output/Figure5/Figure5_respQ10.pdf", respQ10plot_break, width = 90, height = 90, units = "mm", dpi = 300)
-ggsave("Output/Figure5/Figure5_excrQ10.pdf", excrQ10plot_break, width = 175, height = 90, units = "mm", dpi = 300)
-
-
-# # Save the legend from this plot for post digitising
-# legend <- growQ10plot_break + excrQ10plot_break +
-#   plot_layout(guides = "collect") & theme(legend.position = "right")
-# legend
-# # ggsave("Output/Figure5/Figure5_legend.pdf", legend, width = 180, height = 180, units = "mm", dpi = 300)
+ggsave("Output/Figure5_raw/Figure5_clearQ10.pdf", clearQ10plot, width = 90, height = 90, units = "mm", dpi = 300)
+ggsave("Output/Figure5_raw/Figure5_ingQ10.pdf", ingQ10plot_break, width = 90, height = 90, units = "mm", dpi = 300)
+ggsave("Output/Figure5_raw/Figure5_growQ10.pdf", growQ10plot_break, width = 90, height = 90, units = "mm", dpi = 300)
+ggsave("Output/Figure5_raw/Figure5_respQ10.pdf", respQ10plot_break, width = 90, height = 90, units = "mm", dpi = 300)
+ggsave("Output/Figure5_raw/Figure5_excrQ10.pdf", excrQ10plot_break, width = 175, height = 90, units = "mm", dpi = 300)
 
 
 # Save temperature plots
-ggsave("Output/Figure5/FigureS1_tempPlot.pdf", tempPlots, width = 170, height = 220, units = "mm", dpi = 300)
-ggsave("Output/Figure5/FigureS1_tempPlot.png", tempPlots, width = 170, height = 220, units = "mm", dpi = 300)
-
-
+ggsave("Output/FigureS4/FigureS4_tempPlot.pdf", tempPlots, width = 170, height = 220, units = "mm", dpi = 300)
+ggsave("Output/FigureS4/FigureS4_tempPlot.png", tempPlots, width = 170, height = 220, units = "mm", dpi = 300)

@@ -1,4 +1,4 @@
-# Helper functions for temperature sensitivity data analysis for all zooplankton
+# Helper functions for temperature dependence analysis for marine zooplankton
 # Josh Hill
 # 09/02/2026
 
@@ -9,11 +9,9 @@ library(tidyverse)
 
 
 
-############# FUNCTIONS FOR DATA CLEANING AND ANALYSIS ############# 
+# FUNCTIONS FOR DATA CLEANING AND ANALYSIS 
 
-
-
-# BODY MASS AS CARBON CALCULATOR
+# BODY MASS AS CARBON CALCULATOR ----
 # Estimate carbon weight using an allometric equation
 calc_BMC <- function(bodyLength_mm) {
   # Following Jaspers et al. 2009, use the slope (2.455 ugC um), intercept (-6.96 ugC), and trunk length (TL) to estimate carbon mass
@@ -135,7 +133,4 @@ summarise_taxonomic_coverage <- function(data, dataset_name) {
   return(coverage)
 }
 # END OF TAXONOMIC SUMMARY FUNCTION
-
-
-
 

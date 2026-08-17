@@ -17,6 +17,7 @@ library(glmmTMB) # for modelling
 library(DHARMa) # for diagnostics
 library(emmeans) # Estimated marginal means
 library(performance)
+library(ggbreak) # to break y-axis on massive Q10 variance
 library(patchwork)
 theme_set(new = theme_bw())
 
@@ -27,14 +28,12 @@ theme_set(new = theme_bw())
 # Feeding data
 dat <- readRDS("Data/clear_ingest_data.rds")
 
-
 # Clearance data
 cleardat <- dat %>% 
   filter(rate_name == "ClearanceRate") %>% # Filter for clearance rate
   select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Clearance"))
-
 
 # Ingestion data
 ingdat <- dat %>% 
@@ -43,13 +42,11 @@ ingdat <- dat %>%
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Ingestion"))
 
-
 # Growth data
 grwdat <- readRDS("Data/grwth_dat.rds") %>% 
   select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Growth"))
-
 
 # Respiration data
 respdat <- readRDS("Data/resp_dat.rds") %>% 
@@ -57,13 +54,11 @@ respdat <- readRDS("Data/resp_dat.rds") %>%
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Respiration"))
 
-
 # Excretion data
 excredat <- readRDS("Data/excrete_dat.rds") %>% 
   select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Excretion"))
-
 
 # Custom grouping order
 group_order <- c("Crustaceans", 
@@ -98,7 +93,7 @@ mdat <- usedat %>%
   mutate(ln_Cspecific_rate = log(Cspecific_rate)) # log transform mass-specific rate
 
 # Save mdat so we can estimate number of taxa for ratios later...
-# saveRDS(mdat, file = "Data/modelParameters/funcGrp_mdat.rds")
+saveRDS(mdat, file = "Data/modelParameters/funcGrp_mdat.rds")
 
 # Quick look
 mdat %>% 
@@ -120,9 +115,6 @@ summary(mdat)
   # How does temperature dependence vary across rate processes?
 
 # I am also mainly interested in the interactions between at least temp:rate and temp:group
-
-
-
 # Fit the models ----
 
 # A complex model with 3 way interactions for temp, funcGrp and rate with random effects
@@ -220,7 +212,7 @@ params <- data.frame(funcGrp_slopes) %>%
 
 
 # Save the parameter data for later, we'll use this to estimate ratios of the terms
-# saveRDS(params, file = "Data/modelParameters/funcGrpestimates.rds")
+saveRDS(params, file = "Data/modelParameters/funcGrpestimates.rds")
 
 
 # Get n
@@ -365,7 +357,7 @@ funcGQ10plot <- ggplot() +
 funcGQ10plot
 # confidence intervals are not good to visualise, we will break the y-axes to better compared estimates
 
-library(ggbreak) # to break y-axis on massive Q10 variance
+# Break the y-axes and compress the plot slightly for better visuals
 funcG10plot_break <- funcGQ10plot +
   geom_text(data = filter(funcGrp_slopes_Q10, 
                           (rate_name == "Ingestion" & Q10_upr > 5) |
@@ -381,6 +373,6 @@ funcG10plot_break
 tempPlot + funcG10plot_break
 
 # Save it
-ggsave("Output/Figure4/Figure4_tempPlot.pdf", tempPlot, width = 75, height = 240, units = "mm", dpi = 300)
-ggsave("Output/Figure4/Figure4_Q10Plot.pdf", funcG10plot_break, width = 75, height = 240, units = "mm", dpi = 300)
+ggsave("Output/Figure4_raw/Figure4_tempPlot.pdf", tempPlot, width = 75, height = 240, units = "mm", dpi = 300)
+ggsave("Output/Figure4_raw/Figure4_Q10Plot.pdf", funcG10plot_break, width = 75, height = 240, units = "mm", dpi = 300)
 

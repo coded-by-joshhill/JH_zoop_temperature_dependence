@@ -22,7 +22,7 @@ source("R/0_Helpers.R")
 
 
 # Read in the data ----
-dat <- read_csv("https://www.dropbox.com/scl/fi/itv9vpnu8twxz2fyhmp1u/Resp_dat.csv?rlkey=9fig4vcw2cog4rc4qa6mtj7lj&st=zkw9mqxu&dl=1", 
+dat <- read_csv("Data/rawData/Resp_dat.csv", 
                 skip = 1) %>%
   mutate(ref_no = if_else(is.na(ref_no) | ref_no == "", # if the value is NA or empty...
                           paste0("Hill_", row_number()), # apply a unique reference number
@@ -30,7 +30,6 @@ dat <- read_csv("https://www.dropbox.com/scl/fi/itv9vpnu8twxz2fyhmp1u/Resp_dat.c
          taxa = str_squish(taxa)) %>% # remove extra spaces from taxon names
   relocate(ref_no, .before = everything()) %>% # move it before all columns
   filter_out(data_type == "Mean") # exclude any mean data
-
 glimpse(dat)
 
   
@@ -162,14 +161,13 @@ datClean <- dat %>%
     
 # Harmonise and prep data for analysis ----
 datFinal <- datClean %>%
-      
   # Harmonise data with conversion function
   rowwise() %>%
   mutate(.conv = list(
-    if(rate_name == "RespirationRate") {
-      convert_respiration(rate_value, rate_unit, genus)
+    if(rate_name == "RespirationRate") { # For respirate rate
+      convert_respiration(rate_value, rate_unit, genus) # harmonise the rate and update the unit
       } 
-    else {
+    else { # otherwise return NA
       list(rate = NA_real_, unit = NA_character_)
       }),
     rate_value_clean = .conv$rate, 
@@ -179,11 +177,11 @@ datFinal <- datClean %>%
   # Estimate dry mass based on the % from Kiorboe's 2013 Table 1 
   mutate(BM_dry_mg = case_when(zoopGrp == "Appendicularians" ~ BMC_mg / (10.3/100),
                                zoopGrp == "Chaetognaths" ~ BMC_mg / (36.7/100),
-                               zoopGrp == "Cnidarians"   ~ BMC_mg / (13.2/100),
-                               zoopGrp == "Copepods"     ~ BMC_mg / (48/100),
-                               zoopGrp == "Ctenophores"  ~ BMC_mg / (5.1/100),
-                               zoopGrp == "Euphausiids"  ~ BMC_mg / (41.9/100),
-                               zoopGrp == "Thaliaceans"  ~ BMC_mg / (10.3/100))) %>% 
+                               zoopGrp == "Cnidarians" ~ BMC_mg / (13.2/100),
+                               zoopGrp == "Copepods" ~ BMC_mg / (48/100),
+                               zoopGrp == "Ctenophores" ~ BMC_mg / (5.1/100),
+                               zoopGrp == "Euphausiids" ~ BMC_mg / (41.9/100),
+                               zoopGrp == "Thaliaceans" ~ BMC_mg / (10.3/100))) %>% 
       
   # Convert to mass-specific rates
   mutate(Cspecific_rate = case_when(
@@ -203,16 +201,21 @@ datFinal <- datClean %>%
     DrySpecific_unit = case_when(
       rate_name == "RespirationRate" & !is.na(DrySpecific_rate) ~ "ulO2/mgDry/hr",
       TRUE ~ rate_unit_clean)) %>%    
-    
-  select(-c(.conv, BM_wet, BM_dry, BM_C, weight_unit, weight_calc)) %>% # tidy up the dataframe
+  # Tidy up the dataframe
+  select(-c(.conv, BM_wet, BM_dry, BM_C, weight_unit, weight_calc)) %>%
   relocate(Cspecific_rate, .after = rate_name) %>%
   relocate(Cspecific_unit, .after = Cspecific_rate) %>% 
   relocate(rate_value_clean, .after = Cspecific_unit) %>% 
   relocate(rate_unit_clean, .after = rate_value_clean) %>% 
-  filter(Cspecific_rate < 75)
+  filter(Cspecific_rate < 75) # exlcude unrealistic observations
 glimpse(datFinal)
 
 # End harmonisation and conversion ----
+
+
+
+# Save as RDS for later use ---- 
+saveRDS(datFinal, "Data/resp_dat.rds")
 
 
 # Final checks
@@ -224,12 +227,11 @@ glimpse(datFinal)
                    colour = zoopGrp),size = 1.5)
   
   # Check corrected bodymass (at 15DegC) against mass-specific rates
-  datFinal %>% #filter(rate_unit_clean == "ulO2/ind/hr") %>% 
+  datFinal %>%  
     ggplot() + 
     geom_point(aes(x = log10(BMC_mg * 2.35^((15-temp_C)/10)), 
                    y = log10(Cspecific_rate), # mass-specific
                    colour = zoopGrp),size = 1)
-  
   
   # temp
   datFinal %>% 
@@ -250,7 +252,7 @@ glimpse(datFinal)
     # Euphausiids       231
     # Cnidarians        240
     # Copepods          355
-  
+
   
   # Count unique functional groups rates
   datClean %>% 
@@ -280,6 +282,3 @@ glimpse(datFinal)
     summarise( 
       temp_range = paste0(min(temp_C), "-", max(temp_C)))
   # All have sensible ranges for estimating Q10, except for amphipods
-
-# Save as RDS for later use
-# saveRDS(datFinal, "Data/resp_dat.rds")

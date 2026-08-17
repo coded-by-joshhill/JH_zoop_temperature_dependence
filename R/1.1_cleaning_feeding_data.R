@@ -22,7 +22,7 @@ source("R/0_Helpers.R")
 
 
 # Read in the data ----
-dat <- read_csv("https://www.dropbox.com/scl/fi/b1pl3iys1kqtuiwbfd99h/IngClear_dat.csv?rlkey=4ce0im2s1latych74hos8uors&st=2ust8vly&dl=1", 
+dat <- read_csv("Data/rawData/IngClear_dat.csv", 
                 skip = 1) %>%
   mutate(ref_no = paste0("Hill_", row_number()),
          taxa = str_squish(taxa)) %>% # create a unique identifier (e.g., Hill_row#)
@@ -231,15 +231,14 @@ datClean <- dat %>%
     
 # Harmonise and prep data for analysis ----
 datFinal <- datClean %>%
-      
   # Harmonise data with conversion functions
   rowwise() %>%
   mutate(.conv = list(
-    if(rate_name == "ClearanceRate") {
-      convert_clearance(rate_value, rate_unit)
+    if(rate_name == "ClearanceRate") { # if the rate name is clearance rate...
+      convert_clearance(rate_value, rate_unit) # use the custom converter to harmonise the rate and update rate unit
       } 
-    else if(rate_name == "IngestionRate") {
-      convert_ingestion(rate_value, rate_unit)
+    else if(rate_name == "IngestionRate") { # otherwise, if the rate name is ingestion rate...
+      convert_ingestion(rate_value, rate_unit) # as above
       } 
     else {
       list(rate = NA_real_, unit = NA_character_)
@@ -251,20 +250,20 @@ datFinal <- datClean %>%
   # Estimate dry mass based on the % from Kiorboe's 2013 Table 1 
   mutate(BM_dry_mg = case_when(zoopGrp == "Appendicularians" ~ BMC_mg / (10.3/100),
                                zoopGrp == "Chaetognaths" ~ BMC_mg / (36.7/100),
-                               zoopGrp == "Cnidarians"   ~ BMC_mg / (13.2/100),
-                               zoopGrp == "Copepods"     ~ BMC_mg / (48/100),
-                               zoopGrp == "Ctenophores"  ~ BMC_mg / (5.1/100),
-                               zoopGrp == "Euphausiids"  ~ BMC_mg / (41.9/100),
-                               zoopGrp == "Thaliaceans"  ~ BMC_mg / (10.3/100))) %>% 
-      
+                               zoopGrp == "Cnidarians" ~ BMC_mg / (13.2/100),
+                               zoopGrp == "Copepods" ~ BMC_mg / (48/100),
+                               zoopGrp == "Ctenophores" ~ BMC_mg / (5.1/100),
+                               zoopGrp == "Euphausiids" ~ BMC_mg / (41.9/100),
+                               zoopGrp == "Thaliaceans" ~ BMC_mg / (10.3/100))) %>% 
+  
   # Convert to mass-specific rates
   mutate(Cspecific_rate = case_when(
       # Clearance rate
-      rate_name == "ClearanceRate" & rate_unit_clean == "ml/mgC/hr"                   ~ rate_value_clean, # keep as is, already mass-specific
-      rate_name == "ClearanceRate" & rate_unit_clean == "ml/ind/hr" & !is.na(BMC_mg)  ~ rate_value_clean / BMC_mg, # convert to mass-specific
+      rate_name == "ClearanceRate" & rate_unit_clean == "ml/mgC/hr" ~ rate_value_clean, # keep as is, already mass-specific
+      rate_name == "ClearanceRate" & rate_unit_clean == "ml/ind/hr" & !is.na(BMC_mg) ~ rate_value_clean / BMC_mg, # convert to mass-spec
       # Ingestion rate
-      rate_name == "IngestionRate" & rate_unit_clean == "mgC/mgC/hr"                  ~ rate_value_clean, # keep as is, already mass-specific
-      rate_name == "IngestionRate" & rate_unit_clean == "mgC/ind/hr" & !is.na(BMC_mg) ~ rate_value_clean / BMC_mg, # convert to mass-specific
+      rate_name == "IngestionRate" & rate_unit_clean == "mgC/mgC/hr" ~ rate_value_clean, # keep as is, already mass-specific
+      rate_name == "IngestionRate" & rate_unit_clean == "mgC/ind/hr" & !is.na(BMC_mg) ~ rate_value_clean / BMC_mg, # convert to mass-spec
       TRUE ~ NA_real_),
     Cspecific_unit = case_when( # update the mass-specific units to match the mass-specific rates...
       rate_name == "ClearanceRate" & !is.na(Cspecific_rate) ~ "ml/mgC/hr",
@@ -287,23 +286,27 @@ datFinal <- datClean %>%
     sizeGrp = as.factor(sizeGrp),
     funcGrp = as.factor(funcGrp),  
     zoopGrp = as.factor(zoopGrp)) %>%
-  
-  select(-c(.conv, BM_wet, BM_dry, BM_C, weight_unit, weight_calc)) %>% # tidy up the dataframe
+  # Tidy up the dataframe...  
+  select(-c(.conv, BM_wet, BM_dry, BM_C, weight_unit, weight_calc)) %>%
   relocate(Cspecific_rate, .after = rate_name) %>% 
   relocate(Cspecific_unit, .after = Cspecific_rate) %>% 
   relocate(rate_value_clean, .after = Cspecific_unit) %>% 
   relocate(rate_unit_clean, .after = rate_value_clean) %>% 
   # Exclude rates that are not biologically reasonable
   filter(rate_name == "ClearanceRate" & Cspecific_rate < 2000 | 
-         rate_name == "IngestionRate" & Cspecific_rate < 0.15) # remove this extreme outlier,
-    
+         rate_name == "IngestionRate" & Cspecific_rate < 0.15) # remove this extreme outlier
 glimpse(datFinal)
 
 # End harmonisation and mass-specific conversion ----
 
 
 
-# Final checks
+# Save it as an RDS for later use ----
+saveRDS(datFinal, "Data/clear_ingest_data.rds")
+
+
+
+# Final checks ----
   # sizeGrp
   datFinal %>% 
     ggplot() + 
@@ -426,8 +429,3 @@ glimpse(datFinal)
     summarise( 
       temp_range = paste0(min(temp_C), "-", max(temp_C)))
     # Really only have data available for copepods, euphausiids and thaliaceans
-
-  
-# Save it as an RDS for later use
-saveRDS(datFinal, "Data/clear_ingest_data.rds")
-

@@ -27,14 +27,12 @@ theme_set(new = theme_bw())
 # Feeding data
 dat <- readRDS("Data/clear_ingest_data.rds")
 
-
 # Clearance data
 cleardat <- dat %>% 
   filter(rate_name == "ClearanceRate") %>% # Filter for clearance rate
   select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Clearance"))
-
 
 # Ingestion data
 ingdat <- dat %>% 
@@ -43,13 +41,11 @@ ingdat <- dat %>%
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Ingestion"))
 
-
 # Growth data
 grwdat <- readRDS("Data/grwth_dat.rds") %>% 
   select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Growth"))
-
 
 # Respiration data
 respdat <- readRDS("Data/resp_dat.rds") %>% 
@@ -57,13 +53,11 @@ respdat <- readRDS("Data/resp_dat.rds") %>%
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Respiration"))
 
-
 # Excretion data
 excredat <- readRDS("Data/excrete_dat.rds") %>% 
   select(primRef, sizeGrp, funcGrp, zoopGrp, taxa, Cspecific_rate, Cspecific_unit, temp_C, BMC_mg) %>% 
   drop_na(Cspecific_rate) %>% 
   mutate(rate_name = factor("Excretion"))
-
 
 # Custom grouping order
 group_order <- c("Mesoplankton", "Macroplankton") # meso before macro because they're smaller
@@ -95,7 +89,7 @@ mdat <- usedat %>%
   mutate(ln_Cspecific_rate = log(Cspecific_rate)) # log transform mass-specific rate
 
 # Save mdat so we can estimate number of taxa for ratios later...
-# saveRDS(mdat, file = "Data/modelParameters/sizeGrp_mdat.rds")
+saveRDS(mdat, file = "Data/modelParameters/sizeGrp_mdat.rds")
 
 # Quick look
 mdat %>% 
@@ -210,7 +204,7 @@ params <- data.frame(sizeGrp_slopes) %>%
 
 
 # Save the parameter data for later, we'll use this to estimate ratios of the terms
-# saveRDS(params, file = "Data/modelParameters/sizeGrpestimates.rds")
+saveRDS(params, file = "Data/modelParameters/sizeGrpestimates.rds")
 
 
 # Get n
@@ -358,6 +352,5 @@ sizeGQ10plot
 tempPlot+sizeGQ10plot
 
 # Save it
-ggsave("Output/Figure3/Figure3_tempPlot.pdf", tempPlot, width = 75, height = 240, units = "mm", dpi = 300)
-ggsave("Output/Figure3/Figure3_Q10Plot.pdf", sizeGQ10plot, width = 75, height = 240, units = "mm", dpi = 300)
-
+ggsave("Output/Figure3_raw/Figure3_tempPlot.pdf", tempPlot, width = 75, height = 240, units = "mm", dpi = 300)
+ggsave("Output/Figure3_raw/Figure3_Q10Plot.pdf", sizeGQ10plot, width = 75, height = 240, units = "mm", dpi = 300)

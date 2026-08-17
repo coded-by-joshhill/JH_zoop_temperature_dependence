@@ -350,7 +350,3 @@ fig2 <- tempPlot/allZoopQ10plot +
   plot_layout(guides = "collect")
 fig2
 
-
-# Save the plots ----
-# ggsave("Output/Figure2/Figure2_tempPlot.pdf", tempPlot, width = 160, height = 150, units = "mm", dpi = 300)
-# ggsave("Output/Figure2/Figure2_Q10Plot.pdf", allZoopQ10plot, width = 160, height = 70, units = "mm", dpi = 300)

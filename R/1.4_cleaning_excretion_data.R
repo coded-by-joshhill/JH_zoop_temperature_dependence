@@ -22,12 +22,13 @@ source("R/0_Helpers.R")
 
 
 # Read in the data ----
-dat <- read_csv("https://www.dropbox.com/scl/fi/wqxedgj0omi8byr9c3nkp/Excret_dat.csv?rlkey=r37upcwvf6qtxt38f6m54l9tv&st=u6v5kek8&dl=1") %>%
+dat <- read_csv("Data/rawData/Excret_dat.csv") %>%
   mutate(ref_no = if_else(is.na(ref_no) | ref_no == "", # if the value is NA or empty...
                           paste0("Hill_", row_number()), # apply a unique reference number
                           ref_no) # otherwise keep what is there
          ) %>% 
   relocate(ref_no, .before = everything()) %>%  # move it before all columns
+  # Rename the database columns to match all other rate datasets
   rename(
     taxa = scientificName,
     primRef = primaryReference,
@@ -37,17 +38,15 @@ dat <- read_csv("https://www.dropbox.com/scl/fi/wqxedgj0omi8byr9c3nkp/Excret_dat
     rate_value = traitValue,
     rate_name = traitName,
     rate_unit = traitUnit,
-    temp_C = assocTemperature
-    ) %>% 
+    temp_C = assocTemperature) %>% 
   mutate(
     taxa = str_squish(taxa), # remove extra spaces from taxon names
-    taxa = case_when(taxa == "Acartia (Acartiura) clausi" ~ "Acartia (Acartiura) clausii", # fix name...
+    taxa = case_when(taxa == "Acartia (Acartiura) clausi" ~ "Acartia (Acartiura) clausii", # fix this species name...
                           TRUE ~ taxa)) %>%  # leave the rest as is...
-  # Drop these...Worrms package cannot extact info
+  # Drop these...the Worrms package cannot extact info
   filter(taxa != "Beroe",
          taxa != "Beroe cucumis",
          taxa != "Lucifer")
-
 glimpse(dat)
 
   
@@ -175,27 +174,24 @@ datClean <- dat %>%
     relocate(sizeGrp, .before = funcGrp) %>% 
     drop_na(temp_C) %>% 
     filter(funcGrp != "OTHER") # remove other groups...
-
+  glimpse(datClean)
+  
 # End data cleaning ----
-glimpse(datClean)
      
     
 # Harmonise and prep data for analysis ----
 datFinal <- datClean %>%
-
   # Estimate dry mass based on the % from Kiorboe's 2013 Table 1 
   mutate(BMC_mg = case_when(zoopGrp == "Appendicularians" ~ BM_dry_mg * (10.3/100),
                             zoopGrp == "Chaetognaths" ~ BM_dry_mg * (36.7/100),
-                            zoopGrp == "Cnidarians"   ~ BM_dry_mg * (13.2/100),
-                            zoopGrp == "Copepods"     ~ BM_dry_mg * (48/100),
-                            zoopGrp == "Ctenophores"  ~ BM_dry_mg * (5.1/100),
-                            zoopGrp == "Euphausiids"  ~ BM_dry_mg * (41.9/100),
-                            zoopGrp == "Thaliaceans"  ~ BM_dry_mg * (10.3/100),
-                            zoopGrp == "Amphipods"    ~ BM_dry_mg * (34.5/100),
-                            zoopGrp == "Molluscs"     ~ BM_dry_mg * (28.9/100),
-                            zoopGrp == "Mysids"       ~ BM_dry_mg * (43.5/100)
-                            )
-         ) %>% 
+                            zoopGrp == "Cnidarians" ~ BM_dry_mg * (13.2/100),
+                            zoopGrp == "Copepods" ~ BM_dry_mg * (48/100),
+                            zoopGrp == "Ctenophores" ~ BM_dry_mg * (5.1/100),
+                            zoopGrp == "Euphausiids" ~ BM_dry_mg * (41.9/100),
+                            zoopGrp == "Thaliaceans" ~ BM_dry_mg * (10.3/100),
+                            zoopGrp == "Amphipods" ~ BM_dry_mg * (34.5/100),
+                            zoopGrp == "Molluscs" ~ BM_dry_mg * (28.9/100),
+                            zoopGrp == "Mysids" ~ BM_dry_mg * (43.5/100))) %>% 
       
   # Convert to Cmass-specific rates
   mutate(Cspecific_rate = case_when(
@@ -213,29 +209,34 @@ datFinal <- datClean %>%
     DrySpecific_unit = case_when(
       rate_name == "excretionRateN" & !is.na(DrySpecific_rate) ~ "ulO2/mgDry/hr",
       TRUE ~ rate_unit)) %>%    
-    
-  select(-c(sizeAssocName, sizeAssocValue, sizeAssocUnit)) %>% # tidy up the dataframe
+  # Tidy up the dataframe
+  select(-c(sizeAssocName, sizeAssocValue, sizeAssocUnit)) %>%
   relocate(Cspecific_rate, .after = rate_name) %>%
   relocate(Cspecific_unit, .after = Cspecific_rate)
 glimpse(datFinal)
 
 # End harmonisation and conversion ----
 
-# Final checks
+
+
+# Save as RDS for later use ----
+saveRDS(datFinal, "Data/excrete_dat.rds")
+
+
+
+# Final checks ----
   # sizeGrp
   datFinal %>% 
     ggplot() + 
     geom_point(aes(x = temp_C, 
                    y = log(Cspecific_rate), # mass-specific
                    colour = sizeGrp))
-  
   # sizeGrp
   datFinal %>% 
     ggplot() + 
     geom_point(aes(x = temp_C, 
                    y = log(DrySpecific_rate), # absolute
                    colour = sizeGrp))
-  
   
   # funcGrp
   datFinal %>% 
@@ -245,14 +246,12 @@ glimpse(datFinal)
                    colour = funcGrp))
   
  
-  
   # zoopGrp
   datFinal %>% 
     ggplot() + 
     geom_point(aes(x = temp_C, 
                    y = log(Cspecific_rate), # mass-specific
                    colour = zoopGrp))
-  
   
   
   # Count unique ZoopGrps rates
@@ -301,6 +300,3 @@ glimpse(datFinal)
     summarise( 
       temp_range = paste0(min(temp_C), "-", max(temp_C)))
   # All seem fine...
-
-# Save as RDS for later use
-# saveRDS(datFinal, "Data/excrete_dat.rds")
